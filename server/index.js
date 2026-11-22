@@ -136,15 +136,38 @@ async function allFiles(id) {
   return flat;
 }
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "ai-studio", model: process.env.OPENAI_MODEL || "gpt-5.4", apiKeyConfigured: Boolean(process.env.OPENAI_API_KEY) }));
+async function studioFilePath(id, filename) {
+  const project = projectDir(id);
+  const projectStat = await fs.lstat(project);
+  if (projectStat.isSymbolicLink() || !projectStat.isDirectory()) throw new Error("La carpeta del proyecto no es segura.");
+  const dir = path.join(project, ".studio");
+  try {
+    const dirStat = await fs.lstat(dir);
+    if (dirStat.isSymbolicLink() || !dirStat.isDirectory()) throw new Error("La carpeta interna del proyecto no es segura.");
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    await fs.mkdir(dir);
+  }
+  const target = path.join(dir, filename);
+  try {
+    const targetStat = await fs.lstat(target);
+    if (targetStat.isSymbolicLink() || !targetStat.isFile()) throw new Error("El archivo interno del proyecto no es seguro.");
+  } catch (error) { if (error.code !== "ENOENT") throw error; }
+  return target;
+}
 async function readProjectName(id) {
-  try { const meta = JSON.parse(await fs.readFile(path.join(projectDir(id), ".studio", "project.json"), "utf8")); if (typeof meta.name === "string" && meta.name.trim()) return meta.name; } catch {}
-  return id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  try {
+    const target = await studioFilePath(id, "project.json");
+    const meta = JSON.parse(await fs.readFile(target, "utf8"));
+    if (typeof meta.name === "string" && meta.name.trim()) return meta.name;
+  } catch (error) { if (error.code !== "ENOENT") throw error; }
+  return id.replace(/-/g, " ").replace(/\\b\\w/g, (c) => c.toUpperCase());
 }
 async function writeProjectName(id, name) {
-  const dir = path.join(projectDir(id), ".studio");
-  await fs.mkdir(dir, { recursive: true });
-  await fs.writeFile(path.join(dir, "project.json"), JSON.stringify({ name, updatedAt: new Date().toISOString() }, null, 2));
+  const target = await studioFilePath(id, "project.json");
+  await fs.writeFile(target, JSON.stringify({ name, updatedAt: new Date().toISOString() }, null, 2));
 }
+
 app.get("/api/projects", async (_req, res) => {
   try {
     await fs.mkdir(DATA, { recursive: true });
@@ -194,7 +217,7 @@ app.post("/api/projects/:id/stop", (req, res) => { const state = runningProjects
 app.get("/api/projects/:id/conversation", async (req, res) => {
   try {
     const dir = await ensureProject(req.params.id);
-    const target = path.join(dir, ".studio", "conversation.json");
+    const target = await studioFilePath(req.params.id, "conversation.json");
     try { const saved = JSON.parse(await fs.readFile(target, "utf8")); res.json({ messages: Array.isArray(saved.messages) ? saved.messages.slice(-80) : [] }); }
     catch (e) { if (e.code === "ENOENT") return res.json({ messages: [] }); throw e; }
   } catch (e) { res.status(400).json({ error: e.message }); }
@@ -203,9 +226,8 @@ app.put("/api/projects/:id/conversation", async (req, res) => {
   try {
     const dir = await ensureProject(req.params.id);
     const messages = Array.isArray(req.body?.messages) ? req.body.messages.slice(-80).map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: String(m.content || "").slice(0, 20000) })) : [];
-    const targetDir = path.join(dir, ".studio");
-    await fs.mkdir(targetDir, { recursive: true });
-    await fs.writeFile(path.join(targetDir, "conversation.json"), JSON.stringify({ messages, updatedAt: new Date().toISOString() }, null, 2));
+    const target = await studioFilePath(req.params.id, "conversation.json");
+    await fs.writeFile(target, JSON.stringify({ messages, updatedAt: new Date().toISOString() }, null, 2));
     res.json({ ok: true, count: messages.length });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -309,11 +331,12 @@ async function runTool(id, name, args) {
   if (name === "run_terminal_command") return JSON.stringify(await executeTerminal(id, String(args.command || "").slice(0, 2000)));
   if (name === "delete_project_file") { const target = await filePath(id, args.path); await fs.rm(target, { force: true }); return JSON.stringify({ ok: true, deleted: args.path }); }
   if (name === "run_project") return JSON.stringify(await startProject(id));
-  if (name === "read_project_file") return await fs.readFile(await filePath(id, args.path), "utf8");
+  if (name === "read_project_file") { const target = await filePath(id, args.path); const stat = await fs.stat(target); if (stat.size > MAX_TEXT_FILE_BYTES) throw new Error("El archivo supera el límite de 2 MB para lectura."); return await fs.readFile(target, "utf8"); }
   if (name === "write_project_file") {
     const target = await filePath(id, args.path);
+    if (Buffer.byteLength(String(args.content ?? ""), "utf8") > MAX_TEXT_FILE_BYTES) throw new Error("Los archivos de texto no pueden superar 2 MB.");
     await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.writeFile(target, args.content, "utf8");
+    await fs.writeFile(target, String(args.content ?? ""), "utf8");
     return JSON.stringify({ ok: true, path: args.path });
   }
   return JSON.stringify({ error: "Herramienta desconocida" });
