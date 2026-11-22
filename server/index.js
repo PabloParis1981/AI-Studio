@@ -58,7 +58,7 @@ async function startProject(id) {
   if (existing && existing.process.exitCode === null) return { port: existing.port, url: `http://localhost:${existing.port}`, running: Boolean(existing.ready), starting: !existing.ready, logs: existing.logs.join("").slice(-5000) };
   const port = projectPorts.get(id) || await freePort();
   projectPorts.set(id, port);
-  const child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], { cwd: dir, shell: process.platform === "win32", windowsHide: true, detached: process.platform !== "win32", env: { ...process.env, BROWSER: "none" } });
+  const child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], { cwd: dir, shell: process.platform === "win32", windowsHide: true, detached: process.platform !== "win32", env: { ...safeProjectEnv(), BROWSER: "none" } });
   const state = { process: child, port, logs: [], startedAt: Date.now(), ready: false };
   runningProjects.set(id, state);
   const collect = (chunk) => { state.logs.push(String(chunk)); if (state.logs.length > 100) state.logs.shift(); };
@@ -84,6 +84,12 @@ function isLoopbackAddress(address) {
   return value === "::1" || value === "127.0.0.1" || /^127\\./.test(value);
 }
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+function safeProjectEnv() {
+  const sensitiveName = /(API.?KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH|COOKIE|DATABASE_URL|CONNECTION_STRING|PRIVATE_KEY)/i;
+  return Object.fromEntries(Object.entries(process.env).filter(([name]) =>
+    name !== "AI_STUDIO_ENV_PATH" && !sensitiveName.test(name)
+  ));
+}
 app.use((req, res, next) => {
   const remoteAddress = req.socket?.remoteAddress;
   const hostHeader = String(req.headers.host || "");
@@ -332,7 +338,7 @@ async function executeTerminal(id, command) {
   const shell = process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : process.env.SHELL || "/bin/bash";
   const args = process.platform === "win32" ? ["/d", "/s", "/c", command] : ["-lc", command];
   return await new Promise((resolve, reject) => {
-    const child = spawn(shell, args, { cwd, windowsHide: true, detached: process.platform !== "win32", env: { ...process.env, BROWSER: "none", FORCE_COLOR: "0" } });
+    const child = spawn(shell, args, { cwd, windowsHide: true, detached: process.platform !== "win32", env: { ...safeProjectEnv(), BROWSER: "none", FORCE_COLOR: "0" } });
     let output = "";
     let timedOut = false;
     const append = (chunk) => { output += String(chunk); if (output.length > 24000) output = output.slice(-24000); };
