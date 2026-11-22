@@ -32,6 +32,9 @@ export default function App() {
   const [tab, setTab] = useState("preview");
   const [preview, setPreview] = useState(starterHtml);
   const [runInfo, setRunInfo] = useState({ running: false, url: "", logs: "" });
+  const [terminalCommand, setTerminalCommand] = useState("");
+  const [terminalHistory, setTerminalHistory] = useState([]);
+  const [terminalBusy, setTerminalBusy] = useState(false);
   const [error, setError] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const chatEnd = useRef(null);
@@ -70,6 +73,16 @@ export default function App() {
     try { const data = await request(API + "/projects/" + projectId + "/run", { method: "POST" }); setRunInfo(data); if (!data.running) setError(data.logs || "No se pudo iniciar la vista previa."); }
     catch (e) { setError(e.message); }
     finally { setBusy(false); }
+  }
+  async function runTerminalCommand(command = terminalCommand) {
+    const value = command.trim(); if (!value || terminalBusy) return;
+    setTerminalBusy(true); setTerminalCommand("");
+    setTerminalHistory((items) => [...items, { command: value, output: "Ejecutando...", exitCode: null }]);
+    try {
+      const data = await request(API + "/projects/" + projectId + "/terminal", { method: "POST", body: JSON.stringify({ command: value }) });
+      setTerminalHistory((items) => [...items.slice(0, -1), data]);
+    } catch (e) { setTerminalHistory((items) => [...items.slice(0, -1), { command: value, output: e.message, exitCode: 1 }]); }
+    finally { setTerminalBusy(false); }
   }
   async function stopProject() { try { await request(API + "/projects/" + projectId + "/stop", { method: "POST" }); setRunInfo({ running: false, url: "", logs: "" }); } catch (e) { setError(e.message); } }
   async function saveFile() {
@@ -131,7 +144,7 @@ export default function App() {
         <div className="editor-wrap"><textarea className="code-editor" spellCheck="false" value={code} onChange={(e) => { setCode(e.target.value); setSaved(false); }} placeholder="Seleccioná un archivo para empezar a editar..."/></div>
         <div className="bottom-panel">
           <div className="bottom-tabs"><button className={tab === "preview" ? "active" : ""} onClick={() => setTab("preview")}><Monitor size={14}/> Vista previa</button><button className={tab === "terminal" ? "active" : ""} onClick={() => setTab("terminal")}><Terminal size={14}/> Terminal</button></div>
-          {tab === "preview" ? <div className="preview-area"><div className="preview-toolbar"><span><i/> {runInfo.running ? "Aplicación ejecutándose" : "Vista previa del proyecto"}</span><div className="preview-controls">{runInfo.running && <><a href={runInfo.url} target="_blank" rel="noreferrer">Abrir en otra pestaña ↗</a><button onClick={stopProject}>Detener</button></>}<button onClick={runProject}><Play size={12}/> Ejecutar</button><button onClick={refreshPreview}><RefreshCw size={13}/> Actualizar</button></div></div>{runInfo.running ? <iframe title="Vista previa" src={runInfo.url} /> : <iframe title="Vista previa HTML" sandbox="allow-scripts allow-forms" srcDoc={previewDoc || starterHtml}/>}</div> : <div className="terminal-output"><div className="terminal-output-head"><strong><Terminal size={14}/> Salida del proyecto</strong><button onClick={runProject}>Ejecutar proyecto</button></div><pre>{runInfo.logs || "Todavía no hay salida. Presioná Ejecutar para instalar dependencias e iniciar el servidor de desarrollo."}</pre></div>}
+          {tab === "preview" ? <div className="preview-area"><div className="preview-toolbar"><span><i/> {runInfo.running ? "Aplicación ejecutándose" : "Vista previa del proyecto"}</span><div className="preview-controls">{runInfo.running && <><a href={runInfo.url} target="_blank" rel="noreferrer">Abrir en otra pestaña ↗</a><button onClick={stopProject}>Detener</button></>}<button onClick={runProject}><Play size={12}/> Ejecutar</button><button onClick={refreshPreview}><RefreshCw size={13}/> Actualizar</button></div></div>{runInfo.running ? <iframe title="Vista previa" src={runInfo.url} /> : <iframe title="Vista previa HTML" sandbox="allow-scripts allow-forms" srcDoc={previewDoc || starterHtml}/>}</div> : <div className="terminal-output"><div className="terminal-output-head"><strong><Terminal size={14}/> Terminal · {project?.name || "Proyecto"}</strong><button onClick={runProject}>Iniciar vista previa</button></div><div className="terminal-history">{terminalHistory.length ? terminalHistory.map((entry, i) => <div className="terminal-entry" key={i}><div className="terminal-command-line"><span>$</span> {entry.command}</div><pre>{entry.output || "(sin salida)"}{entry.exitCode !== null && entry.exitCode !== undefined ? "\n[código de salida: " + entry.exitCode + "]" : ""}</pre></div>) : <p className="terminal-empty">Terminal del proyecto. Ejecutá comandos npm, inspeccioná archivos y compilá tu aplicación.</p>}{runInfo.logs && <div className="terminal-entry"><div className="terminal-command-line">Salida del servidor de vista previa</div><pre>{runInfo.logs}</pre></div>}</div><form className="terminal-form" onSubmit={(e) => { e.preventDefault(); runTerminalCommand(); }}><span>$</span><input value={terminalCommand} onChange={(e) => setTerminalCommand(e.target.value)} placeholder="npm run build" disabled={terminalBusy}/><button disabled={!terminalCommand.trim() || terminalBusy}>{terminalBusy ? "Ejecutando…" : "Ejecutar"}</button></form></div>}
         </div>
       </section>
       <aside className="chat-panel">
