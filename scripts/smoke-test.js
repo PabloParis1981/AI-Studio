@@ -1,0 +1,83 @@
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import path from "node:path";
+import net from "node:net";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const DATA = path.join(ROOT, "data", "projects");
+const server = net.createServer();
+await new Promise((resolve, reject) => server.listen(0, "127.0.0.1", resolve).once("error", reject));
+const port = server.address().port;
+await new Promise((resolve) => server.close(resolve));
+const child = spawn(process.execPath, ["server/index.js"], {
+  cwd: ROOT,
+  env: { ...process.env, PORT: String(port), OPENAI_API_KEY: "" },
+  stdio: ["ignore", "pipe", "pipe"]
+});
+let logs = "";
+child.stdout.on("data", (chunk) => { logs += String(chunk); });
+child.stderr.on("data", (chunk) => { logs += String(chunk); });
+const base = `http://127.0.0.1:${port}`;
+const createdIds = [];
+async function call(route, options = {}, expectedStatus = 200) {
+  const response = await fetch(base + route, {
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    ...options
+  });
+  const data = await response.json().catch(() => ({}));
+  assert.equal(response.status, expectedStatus, `${options.method || "GET"} ${route}: ${JSON.stringify(data)}`);
+  return data;
+}
+try {
+  let ready = false;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    if (child.exitCode !== null) throw new Error("El servidor terminó antes de iniciar. " + logs);
+    try {
+      const response = await fetch(base + "/api/health");
+      if (response.ok) { ready = true; break; }
+    } catch {}
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  assert.ok(ready, "El servidor no respondió a /api/health. " + logs);
+  const health = await call("/api/health");
+  assert.equal(health.ok, true);
+
+  const created = await call("/api/projects", { method: "POST", body: JSON.stringify({ name: "Smoke Test" }) });
+  const id = created.project.id;
+  createdIds.push(id);
+  await call(`/api/projects/${id}/file`, { method: "PUT", body: JSON.stringify({ path: "src/check.txt", content: "AI Studio smoke test" }) });
+  await call(`/api/projects/${id}/file`, { method: "PUT", body: JSON.stringify({ path: ".env.example", content: "OPENAI_API_KEY=replace-me" }) });
+  const textFile = await call(`/api/projects/${id}/file?path=src%2Fcheck.txt`);
+  assert.equal(textFile.content, "AI Studio smoke test");
+
+  const binary = Buffer.from([0, 1, 2, 127, 255]).toString("base64");
+  await call(`/api/projects/${id}/file-binary`, { method: "POST", body: JSON.stringify({ path: "assets/sample.bin", contentBase64: binary }) });
+  const binaryRead = await call(`/api/projects/${id}/file?path=assets%2Fsample.bin&encoding=base64`);
+  assert.equal(binaryRead.contentBase64, binary);
+
+  await call(`/api/projects/${id}/conversation`, { method: "PUT", body: JSON.stringify({ messages: [{ role: "user", content: "Prueba persistente" }] }) });
+  const conversation = await call(`/api/projects/${id}/conversation`);
+  assert.equal(conversation.messages[0].content, "Prueba persistente");
+
+  await fs.writeFile(path.join(DATA, id, ".env"), "OPENAI_API_KEY=must-not-copy");
+  const renamed = await call(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify({ name: "Proyecto Renombrado" }) });
+  assert.equal(renamed.project.name, "Proyecto Renombrado");
+
+  const duplicate = await call(`/api/projects/${id}/duplicate`, { method: "POST", body: JSON.stringify({ name: "Copia de prueba" }) });
+  createdIds.push(duplicate.project.id);
+  const copied = await call(`/api/projects/${duplicate.project.id}/file?path=src%2Fcheck.txt`);
+  assert.equal(copied.content, "AI Studio smoke test");
+  const copiedExample = await call(`/api/projects/${duplicate.project.id}/file?path=.env.example`);
+  assert.equal(copiedExample.content, "OPENAI_API_KEY=replace-me");
+  await call(`/api/projects/${duplicate.project.id}/file?path=.env`, {}, 404);
+  await call(`/api/projects/${id}/file?path=..%2F..%2Fpackage.json`, {}, 404);
+
+  const listing = await call("/api/projects");
+  assert.ok(listing.projects.some((project) => project.id === id && project.name === "Proyecto Renombrado"));
+  console.log("Smoke tests OK: health, projects, text/binary files, conversation, rename, duplicate, secret exclusion and path traversal.");
+} finally {
+  child.kill();
+  await Promise.all(createdIds.map((id) => fs.rm(path.join(DATA, id), { recursive: true, force: true }).catch(() => {})));
+}
