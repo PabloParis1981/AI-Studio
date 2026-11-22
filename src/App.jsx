@@ -117,6 +117,7 @@ export default function App() {
     if (!projectId) return;
     setBusy(true); setError("");
     try {
+      if (!saved) await saveFile();
       const listing = await request(API + "/projects/" + projectId + "/files");
       const zip = new JSZip();
       const binaryExt = /\\.(png|jpe?g|gif|webp|avif|heic|ico|woff2?|ttf|otf|mp3|mp4|mov|webm|wav|ogg|m4a|pdf|zip|wasm|glb|bin)$/i;
@@ -135,6 +136,7 @@ export default function App() {
   async function createProject() {
     const name = window.prompt("Nombre del nuevo proyecto");
     if (!name?.trim()) return;
+    if (!saved) await saveFile();
     const data = await request(API + "/projects", { method: "POST", body: JSON.stringify({ name }) });
     setProjects((p) => [...p, { ...data.project, files: 2 }]); setProjectId(data.project.id);
     setMessages([{ role: "assistant", content: "Proyecto creado. ¿Qué aplicación vamos a construir?" }]);
@@ -164,6 +166,7 @@ export default function App() {
       }
       if (!files.length) throw new Error("No encontré archivos válidos para importar.");
       const name = file.name.replace(/\\.zip$/i, "").slice(0, 80) || "Proyecto importado";
+      if (!saved) await saveFile();
       const created = await request(API + "/projects", { method: "POST", body: JSON.stringify({ name }) });
       setProjects((p) => [...p, { ...created.project, files: files.length }]);
       setProjectId(created.project.id);
@@ -192,6 +195,7 @@ export default function App() {
   async function createFile() {
     const name = window.prompt("Ruta del archivo, por ejemplo src/App.jsx");
     if (!name?.trim()) return;
+    if (!saved) await saveFile();
     await request(API + "/projects/" + projectId + "/file", { method: "POST", body: JSON.stringify({ path: name, content: "" }) });
     await loadTree(); await openFile(name);
   }
