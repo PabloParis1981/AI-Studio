@@ -62,7 +62,7 @@ async function startProject(id) {
   if (existing && existing.process.exitCode === null) return { port: existing.port, url: IS_PRODUCTION ? `/api/projects/${id}/preview/` : `http://localhost:${existing.port}`, running: Boolean(existing.ready), starting: !existing.ready, logs: existing.logs.join("").slice(-5000) };
   const port = projectPorts.get(id) || await freePort();
   projectPorts.set(id, port);
-  const child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], { cwd: dir, shell: process.platform === "win32", windowsHide: true, detached: process.platform !== "win32", env: { ...safeProjectEnv(), BROWSER: "none" } });
+  const child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort", ...(IS_PRODUCTION ? ["--base", `/api/projects/${id}/preview/`] : [])], { cwd: dir, shell: process.platform === "win32", windowsHide: true, detached: process.platform !== "win32", env: { ...safeProjectEnv(), BROWSER: "none" } });
   const state = { process: child, port, logs: [], startedAt: Date.now(), ready: false };
   runningProjects.set(id, state);
   const collect = (chunk) => { state.logs.push(String(chunk)); if (state.logs.length > 100) state.logs.shift(); };
@@ -209,6 +209,7 @@ async function allFiles(id) {
 }
 const ENV_FILE = process.env.AI_STUDIO_ENV_PATH || path.join(ROOT, ".env");
 app.post("/api/settings/provider-key", async (req, res) => {
+  if (IS_PRODUCTION) return res.status(403).json({ error: "En producción, configurá las claves como secretos del servicio. No se guardan claves desde el navegador." });
   const { provider, apiKey } = req.body || {};
   const envName = provider === "gemini" ? "GEMINI_API_KEY" : provider === "openai" ? "OPENAI_API_KEY" : "";
   if (!envName) return res.status(400).json({ error: "Proveedor no admitido para esta configuración." });
