@@ -319,6 +319,28 @@ app.post("/api/projects/:id/duplicate", async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.post("/api/projects/:id/run", async (req, res) => { try { res.json(await startProject(req.params.id)); } catch (e) { res.status(400).json({ error: e.message }); } });
+// Reverse proxy for project previews: the IDE and preview stay on the same Cloud Run port.
+app.use("/api/projects/:id/preview", (req, res) => {
+  const state = runningProjects.get(req.params.id);
+  if (!state || state.process.exitCode !== null || !state.ready) return res.status(404).send("La vista previa no está iniciada.");
+  const prefix = "/api/projects/" + req.params.id + "/preview";
+  const suffix = req.originalUrl.slice(prefix.length) || "/";
+  const target = http.request({
+    hostname: "127.0.0.1",
+    port: state.port,
+    path: suffix.startsWith("?") ? "/" + suffix : suffix,
+    method: req.method,
+    headers: { ...req.headers, host: "127.0.0.1:" + state.port, authorization: undefined, cookie: undefined }
+  }, (upstream) => {
+    res.status(upstream.statusCode || 502);
+    for (const [name, value] of Object.entries(upstream.headers)) {
+      if (value !== undefined && !["connection", "transfer-encoding"].includes(name.toLowerCase())) res.setHeader(name, value);
+    }
+    upstream.pipe(res);
+  });
+  target.on("error", () => { if (!res.headersSent) res.status(502); res.end("No se pudo cargar la vista previa."); });
+  req.pipe(target);
+});
 app.get("/api/projects/:id/run", (req, res) => { const state = runningProjects.get(req.params.id); const alive = Boolean(state && state.process.exitCode === null); res.json(state ? { running: alive && Boolean(state.ready), starting: alive && !state.ready, port: state.port, url: IS_PRODUCTION ? `/api/projects/${req.params.id}/preview/` : `http://localhost:${state.port}`, logs: state.logs.join("").slice(-8000) } : { running: false, starting: false, logs: "" }); });
 app.post("/api/projects/:id/stop", async (req, res) => { const state = runningProjects.get(req.params.id); if (state) { await terminateProcessTree(state.process); runningProjects.delete(req.params.id); } res.json({ ok: true }); });
 app.get("/api/projects/:id/conversation", async (req, res) => {
