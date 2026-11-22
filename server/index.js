@@ -67,12 +67,25 @@ const projectDir = (id) => {
   if (!target.startsWith(DATA + path.sep)) throw new Error("Ruta de proyecto inválida");
   return target;
 };
-const filePath = (id, relative) => {
+const filePath = async (id, relative) => {
   const base = projectDir(id);
   const rel = String(relative || "").replace(/\\/g, "/");
+  const parts = rel.split("/");
   const target = path.resolve(base, rel);
   if (!rel || (!target.startsWith(base + path.sep) && target !== base)) throw new Error("Ruta de archivo inválida");
-  if (rel.split("/").some((part) => !part || part === ".." || (part.startsWith(".") && ![".gitignore", ".env.example", ".github", ".vscode", ".husky"].includes(part)))) throw new Error("Ruta de archivo no permitida");
+  if (parts.some((part) => !part || part === ".." || (part.startsWith(".") && ![".gitignore", ".env.example", ".github", ".vscode", ".husky"].includes(part)))) throw new Error("Ruta de archivo no permitida");
+  let cursor = base;
+  try {
+    const rootStat = await fs.lstat(base);
+    if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) throw new Error("La carpeta del proyecto no es segura.");
+  } catch (error) { if (error.code !== "ENOENT") throw error; }
+  for (const part of parts) {
+    cursor = path.join(cursor, part);
+    try {
+      const stat = await fs.lstat(cursor);
+      if (stat.isSymbolicLink()) throw new Error("No se permiten enlaces simbólicos dentro del proyecto.");
+    } catch (error) { if (error.code === "ENOENT") break; throw error; }
+  }
   return target;
 };
 async function ensureProject(id, name) {
@@ -100,8 +113,9 @@ async function walk(dir, base = dir) {
     if ((entry.name.startsWith(".") && ![".gitignore", ".env.example", ".github", ".vscode", ".husky"].includes(entry.name)) || entry.name === "node_modules") continue;
     const full = path.join(dir, entry.name);
     const rel = path.relative(base, full).split(path.sep).join("/");
+    if (entry.isSymbolicLink()) continue;
     if (entry.isDirectory()) out.push({ path: rel, type: "folder", children: await walk(full, base) });
-    else out.push({ path: rel, type: "file" });
+    else if (entry.isFile()) out.push({ path: rel, type: "file" });
   }
   return out;
 }
@@ -214,7 +228,7 @@ app.get("/api/projects/:id/files", async (req, res) => {
 });
 app.get("/api/projects/:id/file", async (req, res) => {
   try {
-    const target = filePath(req.params.id, req.query.path);
+    const target = await filePath(req.params.id, req.query.path);
     if (req.query.encoding === "base64") {
       const contentBase64 = (await fs.readFile(target)).toString("base64");
       return res.json({ path: req.query.path, contentBase64 });
@@ -227,7 +241,7 @@ app.put("/api/projects/:id/file", async (req, res) => {
   try {
     const relative = String(req.body?.path || "");
     if (!relative || relative.length > 240) return res.status(400).json({ error: "Nombre de archivo inválido" });
-    const target = filePath(req.params.id, relative);
+    const target = await filePath(req.params.id, relative);
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, String(req.body?.content ?? ""), "utf8");
     res.json({ ok: true, path: relative });
@@ -237,7 +251,7 @@ app.post("/api/projects/:id/file", async (req, res) => {
   try {
     const relative = String(req.body?.path || "");
     if (!relative || relative.length > 240) return res.status(400).json({ error: "Nombre de archivo inválido" });
-    const target = filePath(req.params.id, relative);
+    const target = await filePath(req.params.id, relative);
     try { await fs.access(target); return res.status(409).json({ error: "El archivo ya existe" }); } catch {}
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, String(req.body?.content ?? ""), "utf8");
@@ -249,7 +263,7 @@ app.post("/api/projects/:id/file-binary", async (req, res) => {
     const relative = String(req.body?.path || "");
     const encoded = String(req.body?.contentBase64 || "");
     if (!relative || relative.length > 240 || encoded.length > 10_000_000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) return res.status(400).json({ error: "Archivo binario inválido o demasiado grande." });
-    const target = filePath(req.params.id, relative);
+    const target = await filePath(req.params.id, relative);
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, Buffer.from(encoded, "base64"));
     res.json({ ok: true, path: relative });
@@ -257,7 +271,7 @@ app.post("/api/projects/:id/file-binary", async (req, res) => {
 });
 app.delete("/api/projects/:id/file", async (req, res) => {
   try {
-    const target = filePath(req.params.id, req.body?.path);
+    const target = await filePath(req.params.id, req.body?.path);
     await fs.rm(target, { force: true });
     res.json({ ok: true });
   } catch (e) { res.status(400).json({ error: e.message }); }
@@ -274,11 +288,11 @@ const toolDefinitions = [
 async function runTool(id, name, args) {
   if (name === "list_project_files") return JSON.stringify(await allFiles(id));
   if (name === "run_terminal_command") return JSON.stringify(await executeTerminal(id, String(args.command || "").slice(0, 2000)));
-  if (name === "delete_project_file") { const target = filePath(id, args.path); await fs.rm(target, { force: true }); return JSON.stringify({ ok: true, deleted: args.path }); }
+  if (name === "delete_project_file") { const target = await await filePath(id, args.path); await fs.rm(target, { force: true }); return JSON.stringify({ ok: true, deleted: args.path }); }
   if (name === "run_project") return JSON.stringify(await startProject(id));
-  if (name === "read_project_file") return await fs.readFile(filePath(id, args.path), "utf8");
+  if (name === "read_project_file") return await fs.readFile(await await filePath(id, args.path), "utf8");
   if (name === "write_project_file") {
-    const target = filePath(id, args.path);
+    const target = await await filePath(id, args.path);
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, args.content, "utf8");
     return JSON.stringify({ ok: true, path: args.path });
