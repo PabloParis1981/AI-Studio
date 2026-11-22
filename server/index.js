@@ -239,10 +239,22 @@ app.get("/api/projects/:id/run", (req, res) => { const state = runningProjects.g
 app.post("/api/projects/:id/stop", async (req, res) => { const state = runningProjects.get(req.params.id); if (state) { await terminateProcessTree(state.process); runningProjects.delete(req.params.id); } res.json({ ok: true }); });
 app.get("/api/projects/:id/conversation", async (req, res) => {
   try {
-    const dir = await ensureProject(req.params.id);
-    const target = await studioFilePath(req.params.id, "conversation.json");
-    try { const saved = JSON.parse(await fs.readFile(target, "utf8")); res.json({ messages: Array.isArray(saved.messages) ? saved.messages.slice(-80) : [], provider: saved.provider === "gemini" ? "gemini" : "openai", model: typeof saved.model === "string" ? saved.model : "" }); }
-    catch (e) { if (e.code === "ENOENT") return res.json({ messages: [] }); throw e; }
+    await ensureProject(req.params.id);
+    const provider = req.query.provider === "gemini" ? "gemini" : "openai";
+    const target = await studioFilePath(req.params.id, "conversation-" + provider + ".json");
+    try {
+      const saved = JSON.parse(await fs.readFile(target, "utf8"));
+      res.json({ messages: Array.isArray(saved.messages) ? saved.messages.slice(-80) : [], provider, model: typeof saved.model === "string" ? saved.model : "" });
+    } catch (e) {
+      if (e.code !== "ENOENT") throw e;
+      if (provider === "openai") {
+        try {
+          const legacy = JSON.parse(await fs.readFile(await studioFilePath(req.params.id, "conversation.json"), "utf8"));
+          return res.json({ messages: Array.isArray(legacy.messages) ? legacy.messages.slice(-80) : [], provider, model: typeof legacy.model === "string" ? legacy.model : "" });
+        } catch (legacyError) { if (legacyError.code !== "ENOENT") throw legacyError; }
+      }
+      return res.json({ messages: [], provider, model: "" });
+    }
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.put("/api/projects/:id/conversation", async (req, res) => {
@@ -368,7 +380,7 @@ async function runTool(id, name, args) {
 }
 const assistantInstructions = "Sos el motor de desarrollo de AI Studio, un entorno equivalente a Google AI Studio. Construís aplicaciones web completas dentro del proyecto activo, no simples ejemplos. Prepará proyectos React + Vite, implementá pantallas funcionales, lógica, estilos y persistencia cuando corresponda. Después de cambios importantes, usá run_terminal_command para instalar dependencias, ejecutar compilaciones y pruebas; corregí los errores que aparezcan. Cuando la aplicación compile, iniciá el proyecto con run_project para habilitar una vista previa real. Antes de modificar, inspeccioná los archivos relevantes. Usá las herramientas para leer, listar y escribir archivos. Cuando el usuario pide construir o cambiar algo, hacé los cambios directamente, no te limites a dar instrucciones. Conservá el trabajo existente y explicá brevemente qué archivos cambiaste. No afirmes haber ejecutado pruebas si no las ejecutaste. Nunca solicites ni escribas secretos en archivos del proyecto.";
 function outputText(outputs = []) {
-  return outputs.filter((item) => item.type === "message" || item.type === "text").flatMap((item) => item.content || []).filter((part) => part.type === "output_text" || part.type === "text").map((part) => part.text || "").join("\n");
+  return outputs.filter((item) => item.type === "message" || item.type === "text" || item.type === "model_output").flatMap((item) => item.content || []).filter((part) => part.type === "output_text" || part.type === "text").map((part) => part.text || "").join("\n");
 }
 async function runOpenAI({ apiKey, model, projectId, message, history }) {
   let input = [...history.slice(-10), { role: "user", content: message }];
