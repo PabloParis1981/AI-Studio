@@ -72,3 +72,8 @@ Ejecutá `npm test` para comprobar la API local: creación, lectura y escritura 
 ### Seguridad del espacio de trabajo
 
 La API de archivos rechaza rutas que atraviesan enlaces simbólicos, no muestra enlaces simbólicos en el explorador y no permite usar una carpeta de proyecto que sea un enlace simbólico. Las pruebas automáticas cubren estos casos. El servidor sigue diseñado para uso local: no lo publiques directamente en Internet sin autenticación, aislamiento de procesos y límites de recursos.
+
+
+### Terminal y atajos
+
+La terminal incluye accesos directos para instalar dependencias (`npm install`), compilar (`npm run build`), ejecutar pruebas (`npm test`) y limpiar la salida. En el editor, `Ctrl+S` guarda el archivo y `Ctrl+Shift+Enter` inicia la vista previa.
