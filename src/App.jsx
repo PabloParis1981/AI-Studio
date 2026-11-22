@@ -136,7 +136,7 @@ export default function App() {
       const data = await request(API + "/chat", { method: "POST", body: JSON.stringify({ projectId, message: text, history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })) }) });
       const updatedMessages = [...messages, { role: "user", content: text }, { role: "assistant", content: data.answer }];
       setMessages(updatedMessages);
-      await request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: updatedMessages }) });
+      await request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: updatedMessages }) }).catch(() => {});
       await loadTree();
       const current = activeFile || "index.html";
       try { await openFile(current); } catch {}
