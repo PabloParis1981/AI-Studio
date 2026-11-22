@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
-import { Activity, Bot, ChevronDown, ChevronRight, Code2, Download, File, FilePlus2, Folder, FolderPlus, Github, LayoutPanelLeft, Maximize2, MessageSquare, Monitor, Play, Plus, RefreshCw, Send, Settings2, Sparkles, Terminal, WandSparkles, X } from "lucide-react";
+import { Activity, Bot, ChevronDown, ChevronRight, Code2, Download, File, FilePlus2, Folder, FolderPlus, Github, LayoutPanelLeft, Maximize2, MessageSquare, Monitor, Play, Plus, RefreshCw, Send, Settings2, Sparkles, Terminal, Trash2, WandSparkles, X } from "lucide-react";
 
 const API = "/api";
 const starterHtml = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mi aplicación</title></head><body style="font-family:system-ui;padding:40px"><h1>¡Hola!</h1><p>Tu proyecto empieza aquí.</p></body></html>';
@@ -122,6 +122,12 @@ export default function App() {
     setProjects((p) => [...p, { ...data.project, files: 2 }]); setProjectId(data.project.id);
     setMessages([{ role: "assistant", content: "Proyecto creado. ¿Qué aplicación vamos a construir?" }]);
   }
+  async function deleteActiveFile() {
+    if (!activeFile || !projectId) return;
+    if (!window.confirm("¿Eliminar el archivo " + activeFile + "?")) return;
+    await request(API + "/projects/" + projectId + "/file", { method: "DELETE", body: JSON.stringify({ path: activeFile }) });
+    setActiveFile(""); setCode(""); setSaved(true); await loadTree();
+  }
   async function createFile() {
     const name = window.prompt("Ruta del archivo, por ejemplo src/App.jsx");
     if (!name?.trim()) return;
@@ -165,7 +171,7 @@ export default function App() {
         <div className="sidebar-bottom"><div className="side-status"><Activity size={14}/> Espacio local del proyecto</div><div className="side-status"><Activity size={14}/> Archivos guardados en este equipo</div></div>
       </aside>
       <section className="center-panel">
-        <div className="panel-tabs"><div className="editor-tab"><Code2 size={15}/><span>{activeFile || "Editor"}</span>{!saved && <i className="unsaved-dot"/>}</div><div className="editor-actions"><span className="language-tag">{activeFile.split(".").pop() || "code"}</span><button className="save-button" onClick={() => saveFile().catch((e) => setError(e.message))}>Guardar</button><button className="save-button" onClick={runProject}><Play size={12}/> Ejecutar</button></div></div>
+        <div className="panel-tabs"><div className="editor-tab"><Code2 size={15}/><span>{activeFile || "Editor"}</span>{!saved && <i className="unsaved-dot"/>}</div><div className="editor-actions"><span className="language-tag">{activeFile.split(".").pop() || "code"}</span><button className="save-button" onClick={() => saveFile().catch((e) => setError(e.message))}>Guardar</button>{activeFile && <button className="save-button danger-button" title="Eliminar archivo" onClick={() => deleteActiveFile().catch((e) => setError(e.message))}><Trash2 size={12}/></button>}<button className="save-button" onClick={runProject}><Play size={12}/> Ejecutar</button></div></div>
         <div className="editor-wrap"><textarea className="code-editor" spellCheck="false" value={code} onChange={(e) => { setCode(e.target.value); setSaved(false); }} placeholder="Seleccioná un archivo para empezar a editar..."/></div>
         <div className="bottom-panel">
           <div className="bottom-tabs"><button className={tab === "preview" ? "active" : ""} onClick={() => setTab("preview")}><Monitor size={14}/> Vista previa</button><button className={tab === "terminal" ? "active" : ""} onClick={() => setTab("terminal")}><Terminal size={14}/> Terminal</button></div>
