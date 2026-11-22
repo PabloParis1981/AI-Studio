@@ -62,3 +62,8 @@ El código fuente de AI Studio está versionado en este repositorio. La sincroni
 
 
 La importación y duplicación conservan configuraciones de desarrollo habituales (`.gitignore`, `.env.example`, `.github`, `.vscode` y `.husky`) y excluyen `.env`, credenciales, dependencias y carpetas de compilación.
+
+
+### Pruebas automáticas
+
+Ejecutá `npm test` para comprobar la API local: creación, lectura y escritura de proyectos, recursos binarios, historial, renombrado, duplicación, exclusión de `.env` y protección contra rutas fuera del proyecto. GitHub Actions ejecuta estas pruebas junto con la compilación en cada push a `main`.
