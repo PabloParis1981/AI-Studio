@@ -193,6 +193,7 @@ export default function App() {
       const roots = [...new Set(entries.map((entry) => entry.name.split("/")[0]))];
       const hasRootFiles = entries.some((entry) => !entry.name.includes("/"));
       const stripRoot = roots.length === 1 && !hasRootFiles && entries.every((entry) => entry.name.startsWith(roots[0] + "/"));
+      const binaryExt = /\.(png|jpe?g|gif|webp|avif|heic|ico|woff2?|ttf|otf|mp3|mp4|mov|webm|wav|ogg|m4a|pdf|zip|wasm|glb|bin)$/i;
       const files = [];
       let totalSize = 0;
       for (const entry of entries) {
@@ -203,7 +204,7 @@ export default function App() {
         const size = Number(entry._data?.uncompressedSize || 0);
         totalSize += size;
         if (files.length >= 300 || totalSize > 50 * 1024 * 1024) throw new Error("El ZIP contiene demasiados archivos o supera 50 MB descomprimidos.");
-        if (size > 7 * 1024 * 1024) throw new Error("El archivo " + relative + " supera el límite individual de 7 MB.");
+        if (binaryExt.test(relative) ? size > 7 * 1024 * 1024 : size > 2 * 1024 * 1024) throw new Error("El archivo " + relative + " supera el límite permitido (" + (binaryExt.test(relative) ? "7 MB binario" : "2 MB texto") + ").");
         files.push({ entry, path: relative, size });
       }
       if (!files.length) throw new Error("No encontré archivos válidos para importar.");
@@ -212,7 +213,6 @@ export default function App() {
       const created = await request(API + "/projects", { method: "POST", body: JSON.stringify({ name }) });
       setProjects((p) => [...p, { ...created.project, files: files.length }]);
       setProjectId(created.project.id);
-      const binaryExt = /\.(png|jpe?g|gif|webp|avif|heic|ico|woff2?|ttf|otf|mp3|mp4|mov|webm|wav|ogg|m4a|pdf|zip|wasm|glb|bin)$/i;
       for (const item of files) {
         if (binaryExt.test(item.path)) {
           const base64 = await item.entry.async("base64");
