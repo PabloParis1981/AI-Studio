@@ -1,17 +1,19 @@
 # AI Studio
 
-Un entorno de desarrollo asistido por IA, inspirado en Google AI Studio, con **ChatGPT/OpenAI como motor de construcción** y el código de cada proyecto bajo tu control.
+Un entorno de desarrollo asistido por IA inspirado en Google AI Studio. En lugar de Gemini, el motor que construye y modifica tus proyectos es ChatGPT mediante OpenAI API.
 
-## Qué incluye
+## Funciones
 
-- Espacio de trabajo con explorador de archivos, editor, chat de IA y panel de vista previa.
-- Proyectos React + Vite listos para empezar.
-- El asistente puede inspeccionar, crear y modificar archivos directamente usando herramientas.
-- Ejecución real de cada proyecto mediante su servidor de desarrollo.
-- Instalación automática de dependencias al iniciar por primera vez.
-- Panel de salida del servidor y controles para ejecutar/detener la vista previa.
-- Proyectos guardados en `data/projects`.
-- Integración con OpenAI Responses API; la clave permanece en el servidor.
+- Espacio de trabajo con explorador de archivos, editor de código, chat y vista previa.
+- Proyectos React + Vite creados con una estructura funcional.
+- ChatGPT puede listar, leer, crear y modificar archivos del proyecto.
+- Conversaciones guardadas por proyecto y restauradas al volver a abrirlo.
+- Ejecución real de cada aplicación mediante un servidor Vite independiente.
+- Instalación automática de dependencias al ejecutar un proyecto.
+- Vista previa en vivo y panel de estado del servidor.
+- Terminal interactiva para ejecutar comandos dentro de la carpeta del proyecto.
+- Exportación del proyecto completo a un archivo ZIP.
+- Archivos y proyectos guardados localmente en `data/projects`.
 
 ## Requisitos
 
@@ -27,15 +29,22 @@ Un entorno de desarrollo asistido por IA, inspirado en Google AI Studio, con **C
 5. Ejecutá `npm run dev`.
 6. Abrí http://localhost:5173.
 
-El servidor de la aplicación usa el puerto 8787 y Vite usa el 5173. Los servidores de vista previa de los proyectos se asignan automáticamente desde el puerto 5180.
+El servidor de la aplicación usa el puerto 8787. Los servidores de vista previa de los proyectos se asignan automáticamente desde el puerto 5180.
+
+## Configuración
+
+- `OPENAI_API_KEY`: clave privada de API, solo en el servidor.
+- `OPENAI_MODEL`: modelo de OpenAI a utilizar.
+- `PORT`: puerto del servidor (8787 por defecto).
 
 ## Seguridad
 
-- Nunca pegues la clave de API en el chat ni en archivos del proyecto.
+- No pegues claves privadas en el chat ni en archivos del proyecto.
 - No subas `.env` a GitHub.
-- `.env`, `node_modules`, `dist` y los proyectos locales están excluidos de Git.
-- Esta versión está pensada para ejecutarse localmente. **No la publiques abierta en Internet**: antes hay que agregar autenticación, límites de uso y aislamiento de procesos.
+- Los servidores locales escuchan en loopback y no están pensados para exponerse a Internet.
+- La terminal ejecuta comandos dentro de la carpeta del proyecto. Usala solo con proyectos y dependencias de confianza.
+- Antes de desplegar este entorno para varios usuarios, hay que implementar autenticación, límites de uso y aislamiento de procesos.
 
-## Motor de IA
+## Integración GitHub
 
-El backend usa la API de OpenAI Responses y herramientas de lectura, escritura, listado y ejecución del proyecto. El modelo se configura con `OPENAI_MODEL` y la clave con `OPENAI_API_KEY`.
+El código fuente de AI Studio está versionado en este repositorio. La sincronización de los proyectos creados desde la interfaz con repositorios GitHub todavía requiere configuración y desarrollo adicional.
