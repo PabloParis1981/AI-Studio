@@ -80,7 +80,7 @@ try {
   assert.equal(savedEnv.includes("KEEP_SETTING=preserve-me"), true);
   await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "unknown", apiKey: openaiKey }) }, 400);
   await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "gemini", apiKey: "short" }) }, 400);
-  await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "openai", apiKey: "valid-looking-key-12345678901234567890\\n\nMALICIOUS=value" }) }, 400);
+  await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "openai", apiKey: "valid-looking-key-12345678901234567890\nMALICIOUS=value" }) }, 400);
 
   const created = await call("/api/projects", { method: "POST", body: JSON.stringify({ name: "Smoke Test" }) });
   const id = created.project.id;
