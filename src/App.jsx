@@ -61,6 +61,7 @@ export default function App() {
   async function loadTree(id = projectId) {
     if (!id) return;
     const data = await request(API + "/projects/" + id + "/files");
+    if (editorSnapshot.current.projectId !== id) return;
     setTree(data.tree);
     const projectChanged = lastLoadedProject.current !== id;
     if (projectChanged) lastLoadedProject.current = id;
@@ -71,6 +72,7 @@ export default function App() {
   async function openFile(file, id = projectId) {
     if (!file) return;
     const data = await request(API + "/projects/" + id + "/file?path=" + encodeURIComponent(file));
+    if (editorSnapshot.current.projectId !== id) return;
     setActiveFile(file); setCode(data.content); setSaved(true);
     if (file.endsWith(".html")) setPreview(data.content);
   }
@@ -78,8 +80,12 @@ export default function App() {
   useEffect(() => { if (projectId) loadTree(projectId).catch((e) => setError(e.message)); }, [projectId]);
   useEffect(() => {
     if (!projectId) return;
-    request(API + "/projects/" + projectId + "/conversation").then((data) => setMessages(data.messages?.length ? data.messages : [{ role: "assistant", content: "¡Hola! Soy ChatGPT, tu asistente de desarrollo. Contame qué querés construir y puedo crear o modificar archivos directamente en tu proyecto." }])).catch((e) => setError(e.message));
+    let active = true;
+    request(API + "/projects/" + projectId + "/conversation").then((data) => {
+      if (active) setMessages(data.messages?.length ? data.messages : [{ role: "assistant", content: "¡Hola! Soy ChatGPT, tu asistente de desarrollo. Contame qué querés construir y puedo crear o modificar archivos directamente en tu proyecto." }]);
+    }).catch((e) => { if (active) setError(e.message); });
     setTerminalHistory([]); setRunInfo({ running: false, url: "", logs: "" });
+    return () => { active = false; };
   }, [projectId]);
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, busy]);
   useEffect(() => {
@@ -267,7 +273,7 @@ export default function App() {
   return <div className="app-shell">
     <header className="topbar">
       <div className="brand"><div className="brand-mark"><Sparkles size={18}/></div><div><strong>AI Studio</strong><small>Tu espacio de creación</small></div></div>
-      <div className="top-project"><span>PROYECTO</span><select value={projectId} onChange={(e) => { if (!saved && !window.confirm("Tenés cambios sin guardar. ¿Cambiar de proyecto y descartarlos?")) return; setProjectId(e.target.value); }}>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><button className="icon-button" title="Renombrar proyecto" onClick={renameProject}><Pencil size={15}/></button><button className="icon-button" title="Duplicar proyecto" onClick={duplicateProject}><Copy size={15}/></button><button className="icon-button" title="Nuevo proyecto" onClick={createProject}><Plus size={16}/></button></div>
+      <div className="top-project"><span>PROYECTO</span><select value={projectId} disabled={busy || terminalBusy} onChange={(e) => { if (!saved && !window.confirm("Tenés cambios sin guardar. ¿Cambiar de proyecto y descartarlos?")) return; setProjectId(e.target.value); }}>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><button className="icon-button" title="Renombrar proyecto" disabled={busy || terminalBusy} onClick={renameProject}><Pencil size={15}/></button><button className="icon-button" title="Duplicar proyecto" disabled={busy || terminalBusy} onClick={duplicateProject}><Copy size={15}/></button><button className="icon-button" title="Nuevo proyecto" disabled={busy || terminalBusy} onClick={createProject}><Plus size={16}/></button></div>
       <div className="top-actions"><div className="connection"><i className={health?.apiKeyConfigured ? "online" : ""}/>{health?.apiKeyConfigured ? "IA configurada" : "Falta configurar IA"}</div><button className="icon-button" title="Configuración" onClick={() => setShowSettings(true)}><Settings2 size={17}/></button><a className="icon-button" title="Repositorio GitHub" href="https://github.com/PabloParis1981/AI-Studio" target="_blank" rel="noreferrer"><Github size={17}/></a></div>
     </header>
     {error && <div className="error-banner">{error}<button onClick={() => setError("")}><X size={14}/></button></div>}
