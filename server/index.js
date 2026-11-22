@@ -97,7 +97,7 @@ async function walk(dir, base = dir) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   const out = [];
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+    if ((entry.name.startsWith(".") && ![".gitignore", ".env.example"].includes(entry.name)) || entry.name === "node_modules") continue;
     const full = path.join(dir, entry.name);
     const rel = path.relative(base, full).split(path.sep).join("/");
     if (entry.isDirectory()) out.push({ path: rel, type: "folder", children: await walk(full, base) });
