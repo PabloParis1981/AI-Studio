@@ -481,7 +481,8 @@ app.get("/{*splat}", async (_req, res, next) => {
   catch { next(); }
 });
 const port = Number(process.env.PORT || 3000);
-const httpServer = app.listen(port, "0.0.0.0", () => console.log("AI Studio API running on http://0.0.0.0:" + port));
+const host = process.env.HOST || "127.0.0.1";
+const httpServer = app.listen(port, host, () => console.log("AI Studio API running on http://" + host + ":" + port));
 let shuttingDown = false;
 async function shutdown() {
   if (shuttingDown) return;
