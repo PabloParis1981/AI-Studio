@@ -115,11 +115,20 @@ async function allFiles(id) {
   return flat;
 }
 app.get("/api/health", (_req, res) => res.json({ ok: true, service: "ai-studio", model: process.env.OPENAI_MODEL || "gpt-5.4", apiKeyConfigured: Boolean(process.env.OPENAI_API_KEY) }));
+async function readProjectName(id) {
+  try { const meta = JSON.parse(await fs.readFile(path.join(projectDir(id), ".studio", "project.json"), "utf8")); if (typeof meta.name === "string" && meta.name.trim()) return meta.name; } catch {}
+  return id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+async function writeProjectName(id, name) {
+  const dir = path.join(projectDir(id), ".studio");
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(path.join(dir, "project.json"), JSON.stringify({ name, updatedAt: new Date().toISOString() }, null, 2));
+}
 app.get("/api/projects", async (_req, res) => {
   try {
     await fs.mkdir(DATA, { recursive: true });
     const dirs = (await fs.readdir(DATA, { withFileTypes: true })).filter((d) => d.isDirectory());
-    res.json({ projects: await Promise.all(dirs.map(async (d) => ({ id: d.name, name: d.name.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()), files: (await allFiles(d.name)).length }))) });
+    res.json({ projects: await Promise.all(dirs.map(async (d) => ({ id: d.name, name: await readProjectName(d.name), files: (await allFiles(d.name)).length }))) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.post("/api/projects", async (req, res) => {
@@ -128,6 +137,31 @@ app.post("/api/projects", async (req, res) => {
     const id = safeId(name) + "-" + Date.now().toString(36).slice(-5);
     await ensureProject(id, name);
     res.json({ project: { id, name } });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.patch("/api/projects/:id", async (req, res) => {
+  try {
+    const name = String(req.body?.name || "").trim().slice(0, 80);
+    if (!name) return res.status(400).json({ error: "El nombre no puede estar vacío." });
+    await ensureProject(req.params.id);
+    await writeProjectName(req.params.id, name);
+    res.json({ project: { id: safeId(req.params.id), name } });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.post("/api/projects/:id/duplicate", async (req, res) => {
+  try {
+    const source = projectDir(req.params.id);
+    await fs.access(source);
+    const sourceName = await readProjectName(req.params.id);
+    const name = String(req.body?.name || (sourceName + " (copia)")).trim().slice(0, 80);
+    const id = safeId(name) + "-" + Date.now().toString(36).slice(-5);
+    const target = projectDir(id);
+    await fs.cp(source, target, { recursive: true, filter: (item) => {
+      const rel = path.relative(source, item).split(path.sep).join("/");
+      return !rel.split("/").some((part) => ["node_modules", "dist", ".git", ".studio"].includes(part));
+    }});
+    await writeProjectName(id, name);
+    res.json({ project: { id, name, files: (await allFiles(id)).length } });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.post("/api/projects/:id/run", async (req, res) => { try { res.json(await startProject(req.params.id)); } catch (e) { res.status(400).json({ error: e.message }); } });
