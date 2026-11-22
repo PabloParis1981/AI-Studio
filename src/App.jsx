@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, Bot, ChevronDown, ChevronRight, Code2, File, FilePlus2, Folder, FolderPlus, Github, LayoutPanelLeft, Maximize2, MessageSquare, Monitor, Play, Plus, RefreshCw, Send, Settings2, Sparkles, Terminal, WandSparkles, X } from "lucide-react";
+import JSZip from "jszip";
+import { Activity, Bot, ChevronDown, ChevronRight, Code2, Download, File, FilePlus2, Folder, FolderPlus, Github, LayoutPanelLeft, Maximize2, MessageSquare, Monitor, Play, Plus, RefreshCw, Send, Settings2, Sparkles, Terminal, WandSparkles, X } from "lucide-react";
 
 const API = "/api";
 const starterHtml = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mi aplicación</title></head><body style="font-family:system-ui;padding:40px"><h1>¡Hola!</h1><p>Tu proyecto empieza aquí.</p></body></html>';
@@ -92,6 +93,23 @@ export default function App() {
     if (activeFile.endsWith(".html")) setPreview(code);
     await loadTree();
   }
+  async function exportProject() {
+    if (!projectId) return;
+    setBusy(true); setError("");
+    try {
+      const listing = await request(API + "/projects/" + projectId + "/files");
+      const zip = new JSZip();
+      for (const file of listing.files) {
+        const data = await request(API + "/projects/" + projectId + "/file?path=" + encodeURIComponent(file));
+        zip.file(file, data.content);
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob); const link = document.createElement("a");
+      link.href = url; link.download = (project?.name || "proyecto").toLowerCase().replace(/[^a-z0-9-]+/g, "-") + ".zip";
+      document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+    } catch (e) { setError("No se pudo exportar el proyecto: " + e.message); }
+    finally { setBusy(false); }
+  }
   async function createProject() {
     const name = window.prompt("Nombre del nuevo proyecto");
     if (!name?.trim()) return;
@@ -134,7 +152,7 @@ export default function App() {
     {error && <div className="error-banner">{error}<button onClick={() => setError("")}><X size={14}/></button></div>}
     <main className="workspace">
       <aside className="sidebar">
-        <div className="side-heading"><span>EXPLORADOR</span><div><button className="tiny-button" title="Nuevo archivo" onClick={createFile}><FilePlus2 size={15}/></button><button className="tiny-button" title="Actualizar" onClick={() => loadTree()}><RefreshCw size={14}/></button></div></div>
+        <div className="side-heading"><span>EXPLORADOR</span><div><button className="tiny-button" title="Exportar proyecto ZIP" onClick={exportProject}><Download size={14}/></button><button className="tiny-button" title="Nuevo archivo" onClick={createFile}><FilePlus2 size={15}/></button><button className="tiny-button" title="Actualizar" onClick={() => loadTree()}><RefreshCw size={14}/></button></div></div>
         <div className="project-label"><Folder size={14}/><span>{project?.name || "Proyecto"}</span></div>
         <div className="file-tree"><FileTree nodes={tree} active={activeFile} onOpen={(f) => openFile(f).catch((e) => setError(e.message))}/></div>
         <div className="sidebar-bottom"><div className="side-status"><Activity size={14}/> Espacio local del proyecto</div><div className="side-status"><Activity size={14}/> Archivos guardados en este equipo</div></div>
