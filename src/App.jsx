@@ -31,6 +31,7 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState("preview");
   const [preview, setPreview] = useState(starterHtml);
+  const [runInfo, setRunInfo] = useState({ running: false, url: "", logs: "" });
   const [error, setError] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const chatEnd = useRef(null);
@@ -64,6 +65,13 @@ export default function App() {
   useEffect(() => { loadProjects().catch((e) => setError(e.message)); }, []);
   useEffect(() => { if (projectId) loadTree(projectId).catch((e) => setError(e.message)); }, [projectId]);
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, busy]);
+  async function runProject() {
+    setBusy(true); setError(""); setTab("preview");
+    try { const data = await request(API + "/projects/" + projectId + "/run", { method: "POST" }); setRunInfo(data); if (!data.running) setError(data.logs || "No se pudo iniciar la vista previa."); }
+    catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+  async function stopProject() { try { await request(API + "/projects/" + projectId + "/stop", { method: "POST" }); setRunInfo({ running: false, url: "", logs: "" }); } catch (e) { setError(e.message); } }
   async function saveFile() {
     if (!activeFile || !projectId) return;
     await request(API + "/projects/" + projectId + "/file", { method: "PUT", body: JSON.stringify({ path: activeFile, content: code }) });
@@ -119,11 +127,11 @@ export default function App() {
         <div className="sidebar-bottom"><div className="side-status"><Activity size={14}/> Espacio local del proyecto</div><div className="side-status"><Activity size={14}/> Archivos guardados en este equipo</div></div>
       </aside>
       <section className="center-panel">
-        <div className="panel-tabs"><div className="editor-tab"><Code2 size={15}/><span>{activeFile || "Editor"}</span>{!saved && <i className="unsaved-dot"/>}</div><div className="editor-actions"><span className="language-tag">{activeFile.split(".").pop() || "code"}</span><button className="save-button" onClick={() => saveFile().catch((e) => setError(e.message))}>Guardar</button></div></div>
+        <div className="panel-tabs"><div className="editor-tab"><Code2 size={15}/><span>{activeFile || "Editor"}</span>{!saved && <i className="unsaved-dot"/>}</div><div className="editor-actions"><span className="language-tag">{activeFile.split(".").pop() || "code"}</span><button className="save-button" onClick={() => saveFile().catch((e) => setError(e.message))}>Guardar</button><button className="save-button" onClick={runProject}><Play size={12}/> Ejecutar</button></div></div>
         <div className="editor-wrap"><textarea className="code-editor" spellCheck="false" value={code} onChange={(e) => { setCode(e.target.value); setSaved(false); }} placeholder="Seleccioná un archivo para empezar a editar..."/></div>
         <div className="bottom-panel">
           <div className="bottom-tabs"><button className={tab === "preview" ? "active" : ""} onClick={() => setTab("preview")}><Monitor size={14}/> Vista previa</button><button className={tab === "terminal" ? "active" : ""} onClick={() => setTab("terminal")}><Terminal size={14}/> Terminal</button></div>
-          {tab === "preview" ? <div className="preview-area"><div className="preview-toolbar"><span><i/> Vista previa del proyecto</span><button onClick={refreshPreview}><RefreshCw size={13}/> Actualizar</button></div><iframe title="Vista previa" sandbox="allow-scripts allow-forms" srcDoc={previewDoc || starterHtml}/></div> : <div className="terminal-placeholder"><Terminal size={20}/><strong>Terminal del proyecto</strong><p>La ejecución de comandos y el servidor de desarrollo se habilitarán en una siguiente etapa.</p></div>}
+          {tab === "preview" ? <div className="preview-area"><div className="preview-toolbar"><span><i/> {runInfo.running ? "Aplicación ejecutándose" : "Vista previa del proyecto"}</span><div className="preview-controls">{runInfo.running && <><a href={runInfo.url} target="_blank" rel="noreferrer">Abrir en otra pestaña ↗</a><button onClick={stopProject}>Detener</button></>}<button onClick={runProject}><Play size={12}/> Ejecutar</button><button onClick={refreshPreview}><RefreshCw size={13}/> Actualizar</button></div></div>{runInfo.running ? <iframe title="Vista previa" src={runInfo.url} /> : <iframe title="Vista previa HTML" sandbox="allow-scripts allow-forms" srcDoc={previewDoc || starterHtml}/>}</div> : <div className="terminal-output"><div className="terminal-output-head"><strong><Terminal size={14}/> Salida del proyecto</strong><button onClick={runProject}>Ejecutar proyecto</button></div><pre>{runInfo.logs || "Todavía no hay salida. Presioná Ejecutar para instalar dependencias e iniciar el servidor de desarrollo."}</pre></div>}
         </div>
       </section>
       <aside className="chat-panel">
@@ -136,6 +144,6 @@ export default function App() {
         <div className="chat-composer"><div className="composer-hint">Describí el cambio o la aplicación que querés crear</div><textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }} placeholder="Ej.: Creá una landing page moderna..." rows={3}/><div className="composer-footer"><span><Sparkles size={13}/> La IA puede escribir código</span><button className="send-button" disabled={!prompt.trim() || busy} onClick={sendMessage}><Send size={15}/> Enviar</button></div></div>
       </aside>
     </main>
-    {showSettings && <div className="modal-backdrop" onClick={() => setShowSettings(false)}><div className="settings-modal" onClick={(e) => e.stopPropagation()}><div className="modal-title"><strong>Configuración</strong><button className="icon-button" onClick={() => setShowSettings(false)}><X size={17}/></button></div><div className="setting-row"><Sparkles size={18}/><div><strong>Motor de IA</strong><p>La API key se configura en el servidor mediante la variable OPENAI_API_KEY. Nunca se guarda en el navegador ni en GitHub.</p></div></div><div className="setting-row"><Github size={18}/><div><strong>Repositorio</strong><p>Este proyecto vive en PabloParis1981/AI-Studio. La sincronización automática se incorporará en una siguiente etapa.</p><a href="https://github.com/PabloParis1981/AI-Studio" target="_blank" rel="noreferrer">Abrir repositorio ↗</a></div></div></div></div>}
+    {showSettings && <div className="modal-backdrop" onClick={() => setShowSettings(false)}><div className="settings-modal" onClick={(e) => e.stopPropagation()}><div className="modal-title"><strong>Configuración</strong><button className="icon-button" onClick={() => setShowSettings(false)}><X size={17}/></button></div><div className="setting-row"><Sparkles size={18}/><div><strong>Motor de IA</strong><p>La API key se configura en el servidor mediante la variable OPENAI_API_KEY. Nunca se guarda en el navegador ni en GitHub.</p></div></div><div className="setting-row"><Github size={18}/><div><strong>Repositorio</strong><p>Este proyecto vive en PabloParis1981/AI-Studio. La sincronización GitHub está en desarrollo.</p><a href="https://github.com/PabloParis1981/AI-Studio" target="_blank" rel="noreferrer">Abrir repositorio ↗</a></div></div></div></div>}
   </div>;
 }
