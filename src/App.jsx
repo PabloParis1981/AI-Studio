@@ -80,6 +80,16 @@ export default function App() {
     setTerminalHistory([]); setRunInfo({ running: false, url: "", logs: "" });
   }, [projectId]);
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, busy]);
+  useEffect(() => {
+    if (saved || !activeFile || !projectId) return;
+    const timer = setTimeout(async () => {
+      try {
+        await request(API + "/projects/" + projectId + "/file", { method: "PUT", body: JSON.stringify({ path: activeFile, content: code }) });
+        setSaved(true);
+      } catch (e) { setError("No se pudo guardar automáticamente: " + e.message); }
+    }, 900);
+    return () => clearTimeout(timer);
+  }, [code, saved, activeFile, projectId]);
   async function runProject() {
     setBusy(true); setError(""); setTab("preview");
     try {
