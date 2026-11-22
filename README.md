@@ -6,7 +6,7 @@ Un entorno de desarrollo asistido por IA inspirado en Google AI Studio. Permite 
 
 - Espacio de trabajo con explorador de archivos, editor de código, chat y vista previa.
 - Proyectos React + Vite creados con una estructura funcional.
-- ChatGPT puede listar, leer, crear y modificar archivos del proyecto.
+- ChatGPT y Gemini pueden listar, leer, crear y modificar archivos del proyecto mediante las mismas herramientas.
 - Conversaciones guardadas por proyecto y restauradas al volver a abrirlo.
 - Ejecución real de cada aplicación mediante un servidor Vite independiente.
 - Instalación automática de dependencias al ejecutar un proyecto, con límite de tiempo.
@@ -28,17 +28,18 @@ Un entorno de desarrollo asistido por IA inspirado en Google AI Studio. Permite 
 1. Cloná o descargá este repositorio.
 2. Abrí una terminal en la carpeta.
 3. Ejecutá `npm install`.
-4. Copiá `.env.example` como `.env` y configurá `OPENAI_API_KEY` y/o `GEMINI_API_KEY`.
+4. Copiá `.env.example` como `.env` y configurá `OPENAI_API_KEY` y/o `GEMINI_API_KEY`, o guardá las claves desde Configuración dentro de la aplicación.
 5. Ejecutá `npm run dev`.
-6. Abrí http://localhost:5173.
+6. Abrí http://localhost:3000.
 
-El servidor de la aplicación usa el puerto 8787. Los servidores de vista previa de los proyectos se asignan automáticamente desde el puerto 5180.
+`npm run dev` compila la interfaz y luego inicia el servidor Express. El servidor escucha en `127.0.0.1` y usa el puerto `3000` por defecto (`PORT` permite cambiarlo). Los servidores Vite de vista previa de los proyectos se asignan automáticamente desde el puerto `5180`.
 
 ## Configuración
 
 - `OPENAI_API_KEY`: clave privada de API, solo en el servidor.
-- `OPENAI_MODEL`: modelo de OpenAI a utilizar.\n- `GEMINI_API_KEY`: clave privada de Gemini API, solo en el servidor. También podés guardarla desde Configuración dentro de AI Studio; se escribe en el `.env` local y no se devuelve al navegador.\n- `GEMINI_MODEL`: modelo de Gemini (por defecto `gemini-3.8-flash`).\n\nEn el panel del chat podés elegir el proveedor y el modelo para cada proyecto/conversación. El selector informa si falta configurar la clave. Las conversaciones guardan la selección y las claves nunca se envían al navegador.
-- `PORT`: puerto del servidor (8787 por defecto).
+- `OPENAI_MODEL`: modelo de OpenAI a utilizar.\n- `GEMINI_API_KEY`: clave privada de Gemini API, solo en el servidor. También podés guardarla desde Configuración; se escribe en el `.env` local y no se devuelve al navegador.
+- `OPENAI_API_KEY`: clave privada de OpenAI API, solo en el servidor. También podés guardarla desde Configuración; se escribe en el `.env` local y no se devuelve al navegador.\n- `GEMINI_MODEL`: modelo de Gemini (por defecto `gemini-3.8-flash`).\n\nEn el panel del chat podés elegir el proveedor y el modelo para cada proyecto/conversación. El selector informa si falta configurar la clave. Las conversaciones guardan la selección y las claves nunca se envían al navegador.
+- `PORT`: puerto del servidor (3000 por defecto).
 
 ## Seguridad
 
@@ -50,7 +51,7 @@ El servidor de la aplicación usa el puerto 8787. Los servidores de vista previa
 
 ## Integración GitHub
 
-El código fuente de AI Studio está versionado en este repositorio. La sincronización de los proyectos creados desde la interfaz con repositorios GitHub todavía requiere configuración y desarrollo adicional.
+El código fuente de AI Studio está versionado en este repositorio. La sincronización de los proyectos creados desde la interfaz con repositorios GitHub todavía requiere configuración y desarrollo adicional. Importar este repositorio en una vista previa de un entorno externo no inicia automáticamente el servidor Express: las rutas `/api` y el guardado de claves requieren ejecutar el backend de AI Studio en una instalación local.
 
 
 ### Gestión de proyectos
