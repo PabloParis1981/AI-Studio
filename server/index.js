@@ -25,6 +25,10 @@ async function startProject(id) {
   const dir = await ensureProject(id);
   const pkgPath = path.join(dir, "package.json");
   try { await fs.access(pkgPath); } catch { throw new Error("Este proyecto no tiene package.json. Pedile al asistente que lo prepare como aplicación web."); }
+  const modulesPath = path.join(dir, "node_modules");
+  try { await fs.access(modulesPath); } catch {
+    await new Promise((resolve, reject) => { const install = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["install"], { cwd: dir, shell: process.platform === "win32", windowsHide: true }); let output = ""; install.stdout.on("data", (d) => output += d); install.stderr.on("data", (d) => output += d); install.on("error", reject); install.on("close", (code) => code === 0 ? resolve() : reject(new Error("Falló npm install: " + output.slice(-2500)))); });
+  }
   const existing = runningProjects.get(id);
   if (existing && existing.process.exitCode === null) return { port: existing.port, url: `http://localhost:${existing.port}`, running: true };
   const port = projectPorts.get(id) || await freePort();
