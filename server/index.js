@@ -10,6 +10,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const DATA = path.join(ROOT, "data", "projects");
 const app = express();
+const MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024;
+const MAX_BINARY_FILE_BYTES = 7 * 1024 * 1024;
 const runningProjects = new Map();
 const projectPorts = new Map();
 let nextPort = 5180;
@@ -237,10 +239,13 @@ app.get("/api/projects/:id/files", async (req, res) => {
 app.get("/api/projects/:id/file", async (req, res) => {
   try {
     const target = await filePath(req.params.id, req.query.path);
+    const stat = await fs.stat(target);
     if (req.query.encoding === "base64") {
+      if (stat.size > MAX_BINARY_FILE_BYTES) return res.status(413).json({ error: "El archivo supera el límite de 7 MB para lectura binaria." });
       const contentBase64 = (await fs.readFile(target)).toString("base64");
       return res.json({ path: req.query.path, contentBase64 });
     }
+    if (stat.size > MAX_TEXT_FILE_BYTES) return res.status(413).json({ error: "El archivo supera el límite de 2 MB para abrirlo como texto." });
     const content = await fs.readFile(target, "utf8");
     res.json({ path: req.query.path, content });
   } catch (e) { res.status(404).json({ error: e.message }); }
@@ -249,9 +254,11 @@ app.put("/api/projects/:id/file", async (req, res) => {
   try {
     const relative = String(req.body?.path || "");
     if (!relative || relative.length > 240) return res.status(400).json({ error: "Nombre de archivo inválido" });
+    const content = String(req.body?.content ?? "");
+    if (Buffer.byteLength(content, "utf8") > MAX_TEXT_FILE_BYTES) return res.status(413).json({ error: "Los archivos de texto no pueden superar 2 MB." });
     const target = await filePath(req.params.id, relative);
     await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.writeFile(target, String(req.body?.content ?? ""), "utf8");
+    await fs.writeFile(target, content, "utf8");
     res.json({ ok: true, path: relative });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -259,10 +266,12 @@ app.post("/api/projects/:id/file", async (req, res) => {
   try {
     const relative = String(req.body?.path || "");
     if (!relative || relative.length > 240) return res.status(400).json({ error: "Nombre de archivo inválido" });
+    const content = String(req.body?.content ?? "");
+    if (Buffer.byteLength(content, "utf8") > MAX_TEXT_FILE_BYTES) return res.status(413).json({ error: "Los archivos de texto no pueden superar 2 MB." });
     const target = await filePath(req.params.id, relative);
     try { await fs.access(target); return res.status(409).json({ error: "El archivo ya existe" }); } catch {}
     await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.writeFile(target, String(req.body?.content ?? ""), "utf8");
+    await fs.writeFile(target, content, "utf8");
     res.json({ ok: true, path: relative });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -271,9 +280,11 @@ app.post("/api/projects/:id/file-binary", async (req, res) => {
     const relative = String(req.body?.path || "");
     const encoded = String(req.body?.contentBase64 || "");
     if (!relative || relative.length > 240 || encoded.length > 10_000_000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) return res.status(400).json({ error: "Archivo binario inválido o demasiado grande." });
+    const buffer = Buffer.from(encoded, "base64");
+    if (buffer.length > MAX_BINARY_FILE_BYTES) return res.status(413).json({ error: "Los archivos binarios no pueden superar 7 MB." });
     const target = await filePath(req.params.id, relative);
     await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.writeFile(target, Buffer.from(encoded, "base64"));
+    await fs.writeFile(target, buffer);
     res.json({ ok: true, path: relative });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
