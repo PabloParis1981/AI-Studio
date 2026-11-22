@@ -15,3 +15,5 @@
 
 .provider-toolbar{display:flex;align-items:center;gap:7px;padding:9px 12px;border-bottom:1px solid #292b32;background:#191a20;flex-wrap:wrap}.provider-toolbar label{font-size:9px;color:#858894;text-transform:uppercase;letter-spacing:.7px}.provider-toolbar select{min-width:0;max-width:145px;background:#24232d;border:1px solid #393747;color:#dedee8;border-radius:5px;padding:6px 7px;font-size:10px;outline:none}.provider-toolbar select:focus{border-color:#7565c8}.provider-toolbar span{margin-left:auto;font-size:9px}.provider-ready{color:#72d5a8}.provider-missing{color:#e1ae67}
 @media(max-width:560px){.provider-toolbar select{max-width:125px}.provider-toolbar span{margin-left:0}}
+
+.key-config{display:grid;gap:8px;margin:12px 0;max-width:100%}.key-config label{font-size:11px;color:#c9c7d5}.key-config input{width:100%;min-width:0;background:#22232a;border:1px solid #454653;border-radius:7px;color:#eee;padding:10px;font:11px "DM Mono",monospace;outline:none}.key-config input:focus{border-color:#8b79ed}.key-config button{justify-self:start}.settings-modal{max-height:85vh;overflow:auto}.setting-row>div{min-width:0;flex:1}
