@@ -72,7 +72,7 @@ const filePath = (id, relative) => {
   const rel = String(relative || "").replace(/\\/g, "/");
   const target = path.resolve(base, rel);
   if (!rel || (!target.startsWith(base + path.sep) && target !== base)) throw new Error("Ruta de archivo inválida");
-  if (rel.split("/").some((part) => !part || part === ".." || (part.startsWith(".") && ![".gitignore", ".env.example"].includes(part)))) throw new Error("Ruta de archivo no permitida");
+  if (rel.split("/").some((part) => !part || part === ".." || (part.startsWith(".") && ![".gitignore", ".env.example", ".github", ".vscode", ".husky"].includes(part)))) throw new Error("Ruta de archivo no permitida");
   return target;
 };
 async function ensureProject(id, name) {
@@ -97,7 +97,7 @@ async function walk(dir, base = dir) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   const out = [];
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if ((entry.name.startsWith(".") && ![".gitignore", ".env.example"].includes(entry.name)) || entry.name === "node_modules") continue;
+    if ((entry.name.startsWith(".") && ![".gitignore", ".env.example", ".github", ".vscode", ".husky"].includes(entry.name)) || entry.name === "node_modules") continue;
     const full = path.join(dir, entry.name);
     const rel = path.relative(base, full).split(path.sep).join("/");
     if (entry.isDirectory()) out.push({ path: rel, type: "folder", children: await walk(full, base) });
@@ -158,7 +158,7 @@ app.post("/api/projects/:id/duplicate", async (req, res) => {
     const target = projectDir(id);
     await fs.cp(source, target, { recursive: true, filter: (item) => {
       const rel = path.relative(source, item).split(path.sep).join("/");
-      return !rel.split("/").some((part) => ["node_modules", "dist", ".git", ".studio"].includes(part));
+      return !rel.split("/").some((part) => ["node_modules", "dist", ".git", ".studio"].includes(part) || (part.startsWith(".env") && part !== ".env.example"));
     }});
     await writeProjectName(id, name);
     res.json({ project: { id, name, files: (await allFiles(id)).length } });
