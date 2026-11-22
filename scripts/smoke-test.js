@@ -8,13 +8,15 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = path.join(ROOT, "data", "projects");
+const settingsDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-studio-settings-"));
+const settingsFile = path.join(settingsDir, ".env");
 const server = net.createServer();
 await new Promise((resolve, reject) => server.listen(0, "127.0.0.1", resolve).once("error", reject));
 const port = server.address().port;
 await new Promise((resolve) => server.close(resolve));
 const child = spawn(process.execPath, ["server/index.js"], {
   cwd: ROOT,
-  env: { ...process.env, PORT: String(port), OPENAI_API_KEY: "", GEMINI_API_KEY: "" },
+  env: { ...process.env, PORT: String(port), OPENAI_API_KEY: "", GEMINI_API_KEY: "", AI_STUDIO_ENV_PATH: settingsFile },
   stdio: ["ignore", "pipe", "pipe"]
 });
 let logs = "";
