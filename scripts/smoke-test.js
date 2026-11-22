@@ -73,9 +73,13 @@ try {
   const oversizedBinary = Buffer.alloc(7 * 1024 * 1024 + 1, 7).toString("base64");
   await call(`/api/projects/${id}/file-binary`, { method: "POST", body: JSON.stringify({ path: "assets/too-large.bin", contentBase64: oversizedBinary }) }, 413);
 
-  await call(`/api/projects/${id}/conversation`, { method: "PUT", body: JSON.stringify({ messages: [{ role: "user", content: "Prueba persistente" }] }) });
-  const conversation = await call(`/api/projects/${id}/conversation`);
+  await call(`/api/projects/${id}/conversation`, { method: "PUT", body: JSON.stringify({ messages: [{ role: "user", content: "Prueba persistente" }], provider: "gemini", model: "gemini-3.8-flash" }) });
+  const conversation = await call(`/api/projects/${id}/conversation?provider=gemini`);
   assert.equal(conversation.messages[0].content, "Prueba persistente");
+  assert.equal(conversation.provider, "gemini");
+  assert.equal(conversation.model, "gemini-3.8-flash");
+  const openaiConversation = await call(`/api/projects/${id}/conversation?provider=openai`);
+  assert.equal(openaiConversation.messages.length, 0);
 
   await fs.writeFile(path.join(DATA, id, ".env"), "OPENAI_API_KEY=must-not-copy");
   const renamed = await call(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify({ name: "Proyecto Renombrado" }) });
