@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import { GoogleGenAI } from "@google/genai";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -149,7 +150,15 @@ async function allFiles(id) {
   visit(tree);
   return flat;
 }
-app.get("/api/health", (_req, res) => res.json({ ok: true, service: "ai-studio", model: process.env.OPENAI_MODEL || "gpt-6.2-astra", apiKeyConfigured: Boolean(process.env.OPENAI_API_KEY) }));
+app.get("/api/health", (_req, res) => res.json({
+  ok: true, service: "ai-studio",
+  providers: {
+    openai: { configured: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6.2-astra" },
+    gemini: { configured: Boolean(process.env.GEMINI_API_KEY), model: process.env.GEMINI_MODEL || "gemini-3.8-flash" }
+  },
+  model: process.env.OPENAI_MODEL || "gpt-6.2-astra",
+  apiKeyConfigured: Boolean(process.env.OPENAI_API_KEY)
+}));
 async function studioFilePath(id, filename) {
   const project = projectDir(id);
   const projectStat = await fs.lstat(project);
@@ -232,7 +241,7 @@ app.get("/api/projects/:id/conversation", async (req, res) => {
   try {
     const dir = await ensureProject(req.params.id);
     const target = await studioFilePath(req.params.id, "conversation.json");
-    try { const saved = JSON.parse(await fs.readFile(target, "utf8")); res.json({ messages: Array.isArray(saved.messages) ? saved.messages.slice(-80) : [] }); }
+    try { const saved = JSON.parse(await fs.readFile(target, "utf8")); res.json({ messages: Array.isArray(saved.messages) ? saved.messages.slice(-80) : [], provider: saved.provider === "gemini" ? "gemini" : "openai", model: typeof saved.model === "string" ? saved.model : "" }); }
     catch (e) { if (e.code === "ENOENT") return res.json({ messages: [] }); throw e; }
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
@@ -241,8 +250,10 @@ app.put("/api/projects/:id/conversation", async (req, res) => {
     const dir = await ensureProject(req.params.id);
     const messages = Array.isArray(req.body?.messages) ? req.body.messages.slice(-80).map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: String(m.content || "").slice(0, 20000) })) : [];
     const target = await studioFilePath(req.params.id, "conversation.json");
-    await fs.writeFile(target, JSON.stringify({ messages, updatedAt: new Date().toISOString() }, null, 2));
-    res.json({ ok: true, count: messages.length });
+    const provider = req.body?.provider === "gemini" ? "gemini" : "openai";
+    const model = String(req.body?.model || "").slice(0, 100);
+    await fs.writeFile(target, JSON.stringify({ messages, provider, model, updatedAt: new Date().toISOString() }, null, 2));
+    res.json({ ok: true, count: messages.length, provider, model });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 async function executeTerminal(id, command) {
@@ -355,37 +366,73 @@ async function runTool(id, name, args) {
   }
   return JSON.stringify({ error: "Herramienta desconocida" });
 }
-app.post("/api/chat", async (req, res) => {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return res.status(503).json({ error: "Falta configurar OPENAI_API_KEY en el archivo .env del servidor." });
-  const { projectId, message, history = [] } = req.body || {};
-  if (!projectId || !String(message || "").trim()) return res.status(400).json({ error: "Falta el proyecto o el mensaje." });
-  try {
-    const instructions = "Sos el motor de desarrollo de AI Studio, equivalente al asistente de Google AI Studio pero usando OpenAI. Construís aplicaciones web completas dentro del proyecto activo, no simples ejemplos. Prepará proyectos React + Vite, implementá pantallas funcionales, lógica, estilos y persistencia cuando corresponda. Después de cambios importantes, usá run_terminal_command para instalar dependencias, ejecutar compilaciones y pruebas; corregí los errores que aparezcan. Cuando la aplicación compile, iniciá el proyecto con run_project para habilitar una vista previa real. Antes de modificar, inspeccioná los archivos relevantes. Usá las herramientas para leer, listar y escribir archivos. Cuando el usuario pide construir o cambiar algo, hacé los cambios directamente, no te limites a dar instrucciones. Conservá el trabajo existente y explicá brevemente qué archivos cambiaste. No afirmes haber ejecutado pruebas si no las ejecutaste. Nunca solicites ni escribas secretos en archivos del proyecto.";
-    let input = [...history.slice(-10), { role: "user", content: String(message).slice(0, 12000) }];
-    let previousResponseId;
-    let response;
-    for (let turn = 0; turn < 6; turn++) {
-      const payload = { model: process.env.OPENAI_MODEL || "gpt-6.2-astra", instructions, input, tools: toolDefinitions, tool_choice: "auto", max_output_tokens: 5000 };
-      if (previousResponseId) payload.previous_response_id = previousResponseId;
-      const upstream = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-      const data = await upstream.json();
-      if (!upstream.ok) throw new Error(data.error?.message || "Error al consultar OpenAI");
-      response = data;
-      const calls = (data.output || []).filter((item) => item.type === "function_call");
-      if (!calls.length) break;
-      const outputs = [];
-      for (const call of calls) {
-        let result;
-        try { result = await runTool(projectId, call.name, JSON.parse(call.arguments || "{}")); }
-        catch (e) { result = JSON.stringify({ error: e.message }); }
-        outputs.push({ type: "function_call_output", call_id: call.call_id, output: String(result).slice(0, 30000) });
-      }
-      input = outputs;
-      previousResponseId = data.id;
+const assistantInstructions = "Sos el motor de desarrollo de AI Studio, un entorno equivalente a Google AI Studio. Construís aplicaciones web completas dentro del proyecto activo, no simples ejemplos. Prepará proyectos React + Vite, implementá pantallas funcionales, lógica, estilos y persistencia cuando corresponda. Después de cambios importantes, usá run_terminal_command para instalar dependencias, ejecutar compilaciones y pruebas; corregí los errores que aparezcan. Cuando la aplicación compile, iniciá el proyecto con run_project para habilitar una vista previa real. Antes de modificar, inspeccioná los archivos relevantes. Usá las herramientas para leer, listar y escribir archivos. Cuando el usuario pide construir o cambiar algo, hacé los cambios directamente, no te limites a dar instrucciones. Conservá el trabajo existente y explicá brevemente qué archivos cambiaste. No afirmes haber ejecutado pruebas si no las ejecutaste. Nunca solicites ni escribas secretos en archivos del proyecto.";
+function outputText(outputs = []) {
+  return outputs.filter((item) => item.type === "message" || item.type === "text").flatMap((item) => item.content || []).filter((part) => part.type === "output_text" || part.type === "text").map((part) => part.text || "").join("\n");
+}
+async function runOpenAI({ apiKey, model, projectId, message, history }) {
+  let input = [...history.slice(-10), { role: "user", content: message }];
+  let previousResponseId;
+  let response;
+  for (let turn = 0; turn < 8; turn++) {
+    const payload = { model, instructions: assistantInstructions, input, tools: toolDefinitions, tool_choice: "auto", max_output_tokens: 6000 };
+    if (previousResponseId) payload.previous_response_id = previousResponseId;
+    const upstream = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const data = await upstream.json();
+    if (!upstream.ok) throw new Error(data.error?.message || "Error al consultar OpenAI");
+    response = data;
+    const calls = (data.output || []).filter((item) => item.type === "function_call");
+    if (!calls.length) break;
+    const outputs = [];
+    for (const call of calls) {
+      let result;
+      try { result = await runTool(projectId, call.name, JSON.parse(call.arguments || "{}")); }
+      catch (e) { result = JSON.stringify({ error: e.message }); }
+      outputs.push({ type: "function_call_output", call_id: call.call_id, output: String(result).slice(0, 30000) });
     }
-    const answer = (response?.output || []).filter((item) => item.type === "message").flatMap((item) => item.content || []).filter((c) => c.type === "output_text").map((c) => c.text).join("\n");
-    res.json({ answer: answer || "Terminé de procesar la solicitud.", files: await allFiles(projectId) });
+    input = outputs;
+    previousResponseId = data.id;
+  }
+  return outputText(response?.output || []) || "Terminé de procesar la solicitud.";
+}
+async function runGemini({ apiKey, model, projectId, message, history }) {
+  const ai = new GoogleGenAI({ apiKey });
+  const transcript = [...history.slice(-10), { role: "user", content: message }]
+    .map((item) => (item.role === "assistant" ? "ASISTENTE: " : "USUARIO: ") + String(item.content || "").slice(0, 12000))
+    .join("\n\n");
+  const tools = toolDefinitions.map(({ name, description, parameters }) => ({ type: "function", name, description, parameters }));
+  let interaction = await ai.interactions.create({ model, input: transcript, system_instruction: assistantInstructions, tools });
+  for (let turn = 0; turn < 8; turn++) {
+    const calls = (interaction.outputs || []).filter((item) => item.type === "function_call");
+    if (!calls.length) break;
+    const results = [];
+    for (const call of calls) {
+      let result;
+      try { result = await runTool(projectId, call.name, call.arguments || {}); }
+      catch (e) { result = JSON.stringify({ error: e.message }); }
+      results.push({ type: "function_result", name: call.name, call_id: call.id, result: String(result).slice(0, 30000) });
+    }
+    interaction = await ai.interactions.create({ model, previous_interaction_id: interaction.id, input: results });
+  }
+  const outputs = interaction.outputs || [];
+  const answer = outputs.filter((item) => item.type === "text" || item.type === "message").flatMap((item) => item.content || []).map((part) => part.text || "").filter(Boolean).join("\n");
+  return answer || outputs.map((item) => item.text || "").filter(Boolean).join("\n") || "Terminé de procesar la solicitud.";
+}
+app.post("/api/chat", async (req, res) => {
+  const { projectId, message, history = [] } = req.body || {};
+  const provider = req.body?.provider === "gemini" ? "gemini" : "openai";
+  const configuredKey = provider === "gemini" ? process.env.GEMINI_API_KEY : process.env.OPENAI_API_KEY;
+  if (!configuredKey) return res.status(503).json({ error: provider === "gemini" ? "Falta configurar GEMINI_API_KEY en el archivo .env del servidor." : "Falta configurar OPENAI_API_KEY en el archivo .env del servidor." });
+  if (!projectId || !String(message || "").trim()) return res.status(400).json({ error: "Falta el proyecto o el mensaje." });
+  const defaultModel = provider === "gemini" ? (process.env.GEMINI_MODEL || "gemini-3.8-flash") : (process.env.OPENAI_MODEL || "gpt-6.2-astra");
+  const requestedModel = String(req.body?.model || defaultModel).trim();
+  const model = requestedModel.slice(0, 100);
+  try {
+    const safeHistory = Array.isArray(history) ? history.filter((item) => ["user", "assistant"].includes(item?.role)).slice(-10).map((item) => ({ role: item.role, content: String(item.content || "").slice(0, 12000) })) : [];
+    const answer = provider === "gemini"
+      ? await runGemini({ apiKey: configuredKey, model, projectId, message: String(message).slice(0, 12000), history: safeHistory })
+      : await runOpenAI({ apiKey: configuredKey, model, projectId, message: String(message).slice(0, 12000), history: safeHistory });
+    res.json({ answer, provider, model, files: await allFiles(projectId) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
