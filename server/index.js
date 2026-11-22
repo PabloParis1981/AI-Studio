@@ -432,7 +432,9 @@ async function runGemini({ apiKey, model, projectId, message, history }) {
 }
 app.post("/api/chat", async (req, res) => {
   const { projectId, message, history = [] } = req.body || {};
-  const provider = req.body?.provider === "gemini" ? "gemini" : "openai";
+  const requestedProvider = req.body?.provider ?? "openai";
+  if (!["openai", "gemini"].includes(requestedProvider)) return res.status(400).json({ error: "Proveedor de IA inválido. Elegí openai o gemini." });
+  const provider = requestedProvider;
   const configuredKey = provider === "gemini" ? process.env.GEMINI_API_KEY : process.env.OPENAI_API_KEY;
   if (!configuredKey) return res.status(503).json({ error: provider === "gemini" ? "Falta configurar GEMINI_API_KEY en el archivo .env del servidor." : "Falta configurar OPENAI_API_KEY en el archivo .env del servidor." });
   if (!projectId || !String(message || "").trim()) return res.status(400).json({ error: "Falta el proyecto o el mensaje." });
