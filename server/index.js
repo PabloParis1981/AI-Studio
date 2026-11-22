@@ -17,9 +17,10 @@ const projectDir = (id) => {
 };
 const filePath = (id, relative) => {
   const base = projectDir(id);
-  const target = path.resolve(base, String(relative || "").replace(/\\/g, "/"));
-  if (!target.startsWith(base + path.sep) && target !== base) throw new Error("Ruta de archivo inválida");
-  if (String(relative).split(/[\\/]/).some((part) => part === ".." || part.startsWith("."))) throw new Error("Ruta de archivo no permitida");
+  const rel = String(relative || "").replace(/\\/g, "/");
+  const target = path.resolve(base, rel);
+  if (!rel || (!target.startsWith(base + path.sep) && target !== base)) throw new Error("Ruta de archivo inválida");
+  if (rel.split("/").some((part) => !part || part === ".." || part.startsWith("."))) throw new Error("Ruta de archivo no permitida");
   return target;
 };
 async function ensureProject(id, name) {
@@ -29,15 +30,15 @@ async function ensureProject(id, name) {
   try { await fs.access(marker); }
   catch {
     await fs.writeFile(marker, '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mi aplicación</title></head><body style="font-family:system-ui;padding:40px"><h1>¡Hola!</h1><p>Tu proyecto empieza aquí.</p></body></html>');
-    await fs.writeFile(path.join(dir, "README.md"), "# " + (name || "Mi proyecto") + "\\n\\nCreado con AI Studio.\\n");
+    await fs.writeFile(path.join(dir, "README.md"), "# " + (name || "Mi proyecto") + "\n\nCreado con AI Studio.\n");
   }
   return dir;
 }
 async function walk(dir, base = dir) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   const out = [];
-  for (const entry of entries.sort((a,b) => a.name.localeCompare(b.name))) {
-    if (entry.name.startsWith("." ) || entry.name === "node_modules") continue;
+  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+    if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
     const full = path.join(dir, entry.name);
     const rel = path.relative(base, full).split(path.sep).join("/");
     if (entry.isDirectory()) out.push({ path: rel, type: "folder", children: await walk(full, base) });
@@ -135,10 +136,12 @@ app.post("/api/chat", async (req, res) => {
   if (!projectId || !String(message || "").trim()) return res.status(400).json({ error: "Falta el proyecto o el mensaje." });
   try {
     const instructions = "Sos el asistente de programación integrado en AI Studio. Ayudás a construir aplicaciones web dentro del proyecto activo. Antes de modificar, inspeccioná los archivos relevantes. Usá las herramientas para leer, listar y escribir archivos. Cuando el usuario pide construir o cambiar algo, hacé los cambios directamente, no te limites a dar instrucciones. Conservá el trabajo existente y explicá brevemente qué archivos cambiaste. No afirmes haber ejecutado pruebas si no las ejecutaste. Nunca solicites ni escribas secretos en archivos del proyecto.";
-    let input = [...history.slice(-8), { role: "user", content: String(message).slice(0, 12000) }];
+    let input = [...history.slice(-10), { role: "user", content: String(message).slice(0, 12000) }];
+    let previousResponseId;
     let response;
     for (let turn = 0; turn < 6; turn++) {
       const payload = { model: process.env.OPENAI_MODEL || "gpt-5.4", instructions, input, tools: toolDefinitions, tool_choice: "auto", max_output_tokens: 5000 };
+      if (previousResponseId) payload.previous_response_id = previousResponseId;
       const upstream = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await upstream.json();
       if (!upstream.ok) throw new Error(data.error?.message || "Error al consultar OpenAI");
@@ -153,16 +156,16 @@ app.post("/api/chat", async (req, res) => {
         outputs.push({ type: "function_call_output", call_id: call.call_id, output: String(result).slice(0, 30000) });
       }
       input = outputs;
-      payload.previous_response_id = data.id;
+      previousResponseId = data.id;
     }
-    const answer = (response?.output || []).filter((item) => item.type === "message").flatMap((item) => item.content || []).filter((c) => c.type === "output_text").map((c) => c.text).join("\\n");
+    const answer = (response?.output || []).filter((item) => item.type === "message").flatMap((item) => item.content || []).filter((c) => c.type === "output_text").map((c) => c.text).join("\n");
     res.json({ answer: answer || "Terminé de procesar la solicitud.", files: await allFiles(projectId) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 const dist = path.join(ROOT, "dist");
 app.use(express.static(dist));
-app.get("*", async (req, res, next) => {
+app.get("/{*splat}", async (_req, res, next) => {
   try { await fs.access(path.join(dist, "index.html")); res.sendFile(path.join(dist, "index.html")); }
   catch { next(); }
 });
