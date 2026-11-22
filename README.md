@@ -9,8 +9,9 @@ Un entorno de desarrollo asistido por IA inspirado en Google AI Studio. En lugar
 - ChatGPT puede listar, leer, crear y modificar archivos del proyecto.
 - Conversaciones guardadas por proyecto y restauradas al volver a abrirlo.
 - Ejecución real de cada aplicación mediante un servidor Vite independiente.
-- Instalación automática de dependencias al ejecutar un proyecto.
-- Vista previa en vivo y panel de estado del servidor.
+- Instalación automática de dependencias al ejecutar un proyecto, con límite de tiempo.
+- Vista previa en vivo que espera a que el servidor responda antes de marcarse como iniciada.
+- Protección de cambios sin guardar al ejecutar la aplicación o cambiar de proyecto.
 - Terminal interactiva para ejecutar comandos dentro de la carpeta del proyecto.
 - Exportación del proyecto completo a un archivo ZIP.
 - Archivos y proyectos guardados localmente en `data/projects`.
