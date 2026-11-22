@@ -119,7 +119,7 @@ export default function App() {
     try {
       const listing = await request(API + "/projects/" + projectId + "/files");
       const zip = new JSZip();
-      const binaryExt = /\\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|mp3|mp4|pdf|zip|webm)$/i;
+      const binaryExt = /\\.(png|jpe?g|gif|webp|avif|heic|ico|woff2?|ttf|otf|mp3|mp4|mov|webm|wav|ogg|m4a|pdf|zip|wasm|glb|bin)$/i;
       for (const file of listing.files) {
         const binary = binaryExt.test(file);
         const data = await request(API + "/projects/" + projectId + "/file?path=" + encodeURIComponent(file) + (binary ? "&encoding=base64" : ""));
@@ -159,6 +159,7 @@ export default function App() {
         const size = Number(entry._data?.uncompressedSize || 0);
         totalSize += size;
         if (files.length >= 300 || totalSize > 50 * 1024 * 1024) throw new Error("El ZIP contiene demasiados archivos o supera 50 MB descomprimidos.");
+        if (size > 7 * 1024 * 1024) throw new Error("El archivo " + relative + " supera el límite individual de 7 MB.");
         files.push({ entry, path: relative, size });
       }
       if (!files.length) throw new Error("No encontré archivos válidos para importar.");
@@ -168,7 +169,6 @@ export default function App() {
       setProjectId(created.project.id);
       const binaryExt = /\\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|mp3|mp4|pdf|zip|webm)$/i;
       for (const item of files) {
-        if (item.size > 7 * 1024 * 1024) throw new Error("El archivo " + item.path + " supera el límite individual de 7 MB.");
         if (binaryExt.test(item.path)) {
           const base64 = await item.entry.async("base64");
           await request(API + "/projects/" + created.project.id + "/file-binary", { method: "POST", body: JSON.stringify({ path: item.path, contentBase64: base64 }) });
