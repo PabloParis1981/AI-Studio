@@ -261,9 +261,9 @@ app.put("/api/projects/:id/conversation", async (req, res) => {
   try {
     const dir = await ensureProject(req.params.id);
     const messages = Array.isArray(req.body?.messages) ? req.body.messages.slice(-80).map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: String(m.content || "").slice(0, 20000) })) : [];
-    const target = await studioFilePath(req.params.id, "conversation.json");
     const provider = req.body?.provider === "gemini" ? "gemini" : "openai";
     const model = String(req.body?.model || "").slice(0, 100);
+    const target = await studioFilePath(req.params.id, "conversation-" + provider + ".json");
     await fs.writeFile(target, JSON.stringify({ messages, provider, model, updatedAt: new Date().toISOString() }, null, 2));
     res.json({ ok: true, count: messages.length, provider, model });
   } catch (e) { res.status(400).json({ error: e.message }); }
