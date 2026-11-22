@@ -51,6 +51,11 @@ try {
   assert.equal(health.apiKeyConfigured, false);
   assert.equal(health.providers.openai.configured, false);
   assert.equal(health.providers.gemini.configured, false);
+  assert.equal(health.providers.gemini.model, "gemini-3.8-flash");
+  await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "openai" }) }, 503);
+  await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "unknown" }) }, 400);
+  const geminiMissing = await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "gemini" }) }, 503);
+  assert.match(geminiMissing.error, /GEMINI_API_KEY/);
     const savedKey = "AIzaSyExampleTestKey1234567890";
     const keyResult = await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "gemini", apiKey: savedKey }) });
     assert.equal(keyResult.ok, true);
@@ -58,11 +63,7 @@ try {
     assert.equal((await call("/api/health")).providers.gemini.configured, true);
     await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "openai", apiKey: savedKey }) }, 400);
     await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "gemini", apiKey: "short" }) }, 400);
-  assert.equal(health.providers.gemini.model, "gemini-3.8-flash");
-  await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "openai" }) }, 503);
-  await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "unknown" }) }, 400);
-  const geminiMissing = await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "gemini" }) }, 503);
-  assert.match(geminiMissing.error, /GEMINI_API_KEY/);
+
 
   const created = await call("/api/projects", { method: "POST", body: JSON.stringify({ name: "Smoke Test" }) });
   const id = created.project.id;
