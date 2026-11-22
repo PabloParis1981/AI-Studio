@@ -11,7 +11,8 @@ Un entorno de desarrollo asistido por IA inspirado en Google AI Studio. En lugar
 - Ejecución real de cada aplicación mediante un servidor Vite independiente.
 - Instalación automática de dependencias al ejecutar un proyecto, con límite de tiempo.
 - Vista previa en vivo que espera a que el servidor responda antes de marcarse como iniciada.
-- Protección de cambios sin guardar al ejecutar la aplicación o cambiar de proyecto.
+- Guardado automático del editor después de una breve pausa, además del guardado manual.
+- Protección de cambios pendientes al ejecutar la aplicación o cambiar de proyecto.
 - Terminal interactiva para ejecutar comandos dentro de la carpeta del proyecto.
 - Importación y exportación ZIP del proyecto, con soporte para recursos binarios y exclusión de archivos sensibles.
 - La vista previa consulta el estado del servidor cuando tarda más de lo habitual.
