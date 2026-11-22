@@ -89,7 +89,7 @@ export default function App() {
     if (!text || busy || !projectId) return;
     setPrompt(""); setMessages((m) => [...m, { role: "user", content: text }]); setBusy(true); setError("");
     try {
-      const data = await request(API + "/chat", { method: "POST", body: JSON.stringify({ projectId, message: text }) });
+      const data = await request(API + "/chat", { method: "POST", body: JSON.stringify({ projectId, message: text, history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })) }) });
       setMessages((m) => [...m, { role: "assistant", content: data.answer }]);
       await loadTree();
       const current = activeFile || "index.html";
@@ -116,7 +116,7 @@ export default function App() {
         <div className="side-heading"><span>EXPLORADOR</span><div><button className="tiny-button" title="Nuevo archivo" onClick={createFile}><FilePlus2 size={15}/></button><button className="tiny-button" title="Actualizar" onClick={() => loadTree()}><RefreshCw size={14}/></button></div></div>
         <div className="project-label"><Folder size={14}/><span>{project?.name || "Proyecto"}</span></div>
         <div className="file-tree"><FileTree nodes={tree} active={activeFile} onOpen={(f) => openFile(f).catch((e) => setError(e.message))}/></div>
-        <div className="sidebar-bottom"><div className="side-status"><Activity size={14}/> Espacio local del proyecto</div><div className="side-status"><Github size={14}/> GitHub listo para conectar</div></div>
+        <div className="sidebar-bottom"><div className="side-status"><Activity size={14}/> Espacio local del proyecto</div><div className="side-status"><Activity size={14}/> Archivos guardados en este equipo</div></div>
       </aside>
       <section className="center-panel">
         <div className="panel-tabs"><div className="editor-tab"><Code2 size={15}/><span>{activeFile || "Editor"}</span>{!saved && <i className="unsaved-dot"/>}</div><div className="editor-actions"><span className="language-tag">{activeFile.split(".").pop() || "code"}</span><button className="save-button" onClick={() => saveFile().catch((e) => setError(e.message))}>Guardar</button></div></div>
