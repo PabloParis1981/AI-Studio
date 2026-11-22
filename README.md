@@ -19,9 +19,9 @@ Primera base funcional en construcción:
 
 1. Descargá o cloná este repositorio.
 2. Abrí una terminal en la carpeta del proyecto.
-3. Ejecutá \`npm install\`.
-4. Copiá \`.env.example\` como \`.env\` y agregá tu clave en \`OPENAI_API_KEY\`.
-5. Ejecutá \`npm run dev\`.
+3. Ejecutá `npm install`.
+4. Copiá `.env.example` como `.env` y agregá tu clave en `OPENAI_API_KEY`.
+5. Ejecutá `npm run dev`.
 6. Abrí la dirección local que muestra Vite (normalmente http://localhost:5173).
 
 El servidor de la API usa el puerto 8787 por defecto.
@@ -29,8 +29,8 @@ El servidor de la API usa el puerto 8787 por defecto.
 ## Seguridad
 
 - No compartas tu clave por el chat.
-- No subas \`.env\` a GitHub.
-- Los proyectos creados se guardan en \`data/projects\`, que está excluida de Git.
+- No subas `.env` a GitHub.
+- Los proyectos creados se guardan en `data/projects`, que está excluida de Git.
 
 ## Próximas etapas
 
