@@ -139,13 +139,19 @@ export default function App() {
     if (!text || busy || !projectId) return;
     setPrompt(""); setMessages((m) => [...m, { role: "user", content: text }]); setBusy(true); setError("");
     try {
+      const pendingMessages = [...messages, { role: "user", content: text }];
+      await request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: pendingMessages }) }).catch(() => {});
       const data = await request(API + "/chat", { method: "POST", body: JSON.stringify({ projectId, message: text, history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })) }) });
       const updatedMessages = [...messages, { role: "user", content: text }, { role: "assistant", content: data.answer }];
       setMessages(updatedMessages);
       await request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: updatedMessages }) }).catch(() => {});
-      await loadTree();
-      const current = activeFile || "index.html";
-      try { await openFile(current); } catch {}
+      try {
+        await loadTree();
+        const current = activeFile || "index.html";
+        try { await openFile(current); } catch {}
+      } catch (refreshError) {
+        setError("La respuesta se completó, pero no pude actualizar el explorador: " + refreshError.message);
+      }
       setTab("preview");
     } catch (e) { const updatedMessages = [...messages, { role: "user", content: text }, { role: "assistant", content: "No pude completar el pedido: " + e.message }]; setMessages(updatedMessages); request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: updatedMessages }) }).catch(() => {}); }
     finally { setBusy(false); }
