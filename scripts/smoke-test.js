@@ -14,7 +14,7 @@ const port = server.address().port;
 await new Promise((resolve) => server.close(resolve));
 const child = spawn(process.execPath, ["server/index.js"], {
   cwd: ROOT,
-  env: { ...process.env, PORT: String(port), OPENAI_API_KEY: "" },
+  env: { ...process.env, PORT: String(port), OPENAI_API_KEY: "", GEMINI_API_KEY: "" },
   stdio: ["ignore", "pipe", "pipe"]
 });
 let logs = "";
@@ -45,7 +45,12 @@ try {
   const health = await call("/api/health");
   assert.equal(health.ok, true);
   assert.equal(health.apiKeyConfigured, false);
-  await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola" }) }, 503);
+  assert.equal(health.providers.openai.configured, false);
+  assert.equal(health.providers.gemini.configured, false);
+  assert.equal(health.providers.gemini.model, "gemini-3.8-flash");
+  await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "openai" }) }, 503);
+  const geminiMissing = await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "gemini" }) }, 503);
+  assert.match(geminiMissing.error, /GEMINI_API_KEY/);
 
   const created = await call("/api/projects", { method: "POST", body: JSON.stringify({ name: "Smoke Test" }) });
   const id = created.project.id;
@@ -106,7 +111,7 @@ try {
 
   const listing = await call("/api/projects");
   assert.ok(listing.projects.some((project) => project.id === id && project.name === "Proyecto Renombrado"));
-  console.log("Smoke tests OK: health, missing-key handling, projects, bounded text/binary files, conversation, rename, duplicate, secret exclusion, path traversal, project symlink and internal metadata symlink protection.");
+  console.log("Smoke tests OK: health, OpenAI/Gemini missing-key handling and provider persistence, projects, bounded text/binary files, conversation, rename, duplicate, secret exclusion, path traversal, project symlink and internal metadata symlink protection.");
 } finally {
   child.kill();
   await Promise.all(createdIds.map((id) => fs.rm(path.join(DATA, id), { recursive: true, force: true }).catch(() => {})));
