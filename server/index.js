@@ -6,7 +6,6 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import net from "node:net";
 import http from "node:http";
-import { timingSafeEqual } from "node:crypto";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
@@ -94,21 +93,9 @@ function safeProjectEnv() {
   ));
 }
 app.use((req, res, next) => {
-  if (IS_PRODUCTION) {
-    const expected = Buffer.from(String(process.env.APP_PASSWORD || ""));
-    if (expected.length < 16) return res.status(503).json({ error: "Falta configurar APP_PASSWORD (mínimo 16 caracteres) en el servicio." });
-    const match = String(req.headers.authorization || "").match(/^Basic\\s+(.+)$/i);
-    let supplied = Buffer.alloc(0);
-    try {
-      const decoded = match ? Buffer.from(match[1], "base64").toString("utf8") : "";
-      supplied = Buffer.from(decoded.slice(decoded.indexOf(":") + 1));
-    } catch {}
-    const valid = supplied.length === expected.length && timingSafeEqual(supplied, expected);
-    if (!valid) {
-      res.setHeader("WWW-Authenticate", 'Basic realm="AI Studio privado", charset="UTF-8"');
-      return res.status(401).json({ error: "Ingresá la contraseña privada de AI Studio." });
-    }
-  } else {
+  // AI Studio es una herramienta personal: no exigir usuario ni contraseña.
+  // En desarrollo local se conserva la restricción de loopback.
+  if (!IS_PRODUCTION) {
     const remoteAddress = req.socket?.remoteAddress;
     const hostHeader = String(req.headers.host || "");
     let parsedHost;
