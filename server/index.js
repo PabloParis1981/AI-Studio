@@ -33,7 +33,7 @@ async function startProject(id) {
   if (existing && existing.process.exitCode === null) return { port: existing.port, url: `http://localhost:${existing.port}`, running: true };
   const port = projectPorts.get(id) || await freePort();
   projectPorts.set(id, port);
-  const child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev", "--", "--host", "0.0.0.0", "--port", String(port), "--strictPort"], { cwd: dir, shell: process.platform === "win32", windowsHide: true, env: { ...process.env, BROWSER: "none" } });
+  const child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], { cwd: dir, shell: process.platform === "win32", windowsHide: true, env: { ...process.env, BROWSER: "none" } });
   const state = { process: child, port, logs: [], startedAt: Date.now() };
   runningProjects.set(id, state);
   const collect = (chunk) => { state.logs.push(String(chunk)); if (state.logs.length > 100) state.logs.shift(); };
@@ -218,4 +218,4 @@ app.get("/{*splat}", async (_req, res, next) => {
   catch { next(); }
 });
 const port = Number(process.env.PORT || 8787);
-app.listen(port, () => console.log("AI Studio API running on http://localhost:" + port));
+app.listen(port, "127.0.0.1", () => console.log("AI Studio API running on http://localhost:" + port));
