@@ -170,9 +170,11 @@ app.post("/api/projects/:id/duplicate", async (req, res) => {
     const name = String(req.body?.name || (sourceName + " (copia)")).trim().slice(0, 80);
     const id = safeId(name) + "-" + Date.now().toString(36).slice(-5);
     const target = projectDir(id);
-    await fs.cp(source, target, { recursive: true, filter: (item) => {
+    await fs.cp(source, target, { recursive: true, filter: async (item) => {
       const rel = path.relative(source, item).split(path.sep).join("/");
-      return !rel.split("/").some((part) => ["node_modules", "dist", ".git", ".studio"].includes(part) || (part.startsWith(".env") && part !== ".env.example"));
+      if (rel && rel.split("/").some((part) => ["node_modules", "dist", ".git", ".studio"].includes(part) || (part.startsWith(".env") && part !== ".env.example"))) return false;
+      try { if ((await fs.lstat(item)).isSymbolicLink()) return false; } catch {}
+      return true;
     }});
     await writeProjectName(id, name);
     res.json({ project: { id, name, files: (await allFiles(id)).length } });
@@ -288,11 +290,11 @@ const toolDefinitions = [
 async function runTool(id, name, args) {
   if (name === "list_project_files") return JSON.stringify(await allFiles(id));
   if (name === "run_terminal_command") return JSON.stringify(await executeTerminal(id, String(args.command || "").slice(0, 2000)));
-  if (name === "delete_project_file") { const target = await await filePath(id, args.path); await fs.rm(target, { force: true }); return JSON.stringify({ ok: true, deleted: args.path }); }
+  if (name === "delete_project_file") { const target = await filePath(id, args.path); await fs.rm(target, { force: true }); return JSON.stringify({ ok: true, deleted: args.path }); }
   if (name === "run_project") return JSON.stringify(await startProject(id));
-  if (name === "read_project_file") return await fs.readFile(await await filePath(id, args.path), "utf8");
+  if (name === "read_project_file") return await fs.readFile(await filePath(id, args.path), "utf8");
   if (name === "write_project_file") {
-    const target = await await filePath(id, args.path);
+    const target = await filePath(id, args.path);
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, args.content, "utf8");
     return JSON.stringify({ ok: true, path: args.path });
