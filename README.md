@@ -82,3 +82,8 @@ La terminal incluye accesos directos para instalar dependencias (`npm install`),
 ### Límites de archivos en el servidor
 
 El servidor aplica límites aunque se invoque la API directamente: 2 MB para archivos de texto (tanto lectura como escritura) y 7 MB para archivos binarios. Los límites se validan antes de leer o guardar el contenido, y las pruebas automáticas comprueban los rechazos por tamaño.
+
+
+### Procesos y datos internos
+
+El servidor protege también los archivos internos de configuración e historial del proyecto frente a enlaces simbólicos. Al detener una vista previa o al vencer el tiempo de una tarea, intenta cerrar el árbol completo de procesos para evitar servidores o comandos hijos huérfanos.
