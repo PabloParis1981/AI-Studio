@@ -37,7 +37,7 @@ El servidor de la aplicación usa el puerto 8787. Los servidores de vista previa
 ## Configuración
 
 - `OPENAI_API_KEY`: clave privada de API, solo en el servidor.
-- `OPENAI_MODEL`: modelo de OpenAI a utilizar.\n- `GEMINI_API_KEY`: clave privada de Gemini API, solo en el servidor.\n- `GEMINI_MODEL`: modelo de Gemini (por defecto `gemini-3.8-flash`).\n\nEn el panel del chat podés elegir el proveedor y el modelo para cada proyecto/conversación. El selector informa si falta configurar la clave. Las conversaciones guardan la selección y las claves nunca se envían al navegador.
+- `OPENAI_MODEL`: modelo de OpenAI a utilizar.\n- `GEMINI_API_KEY`: clave privada de Gemini API, solo en el servidor. También podés guardarla desde Configuración dentro de AI Studio; se escribe en el `.env` local y no se devuelve al navegador.\n- `GEMINI_MODEL`: modelo de Gemini (por defecto `gemini-3.8-flash`).\n\nEn el panel del chat podés elegir el proveedor y el modelo para cada proyecto/conversación. El selector informa si falta configurar la clave. Las conversaciones guardan la selección y las claves nunca se envían al navegador.
 - `PORT`: puerto del servidor (8787 por defecto).
 
 ## Seguridad
