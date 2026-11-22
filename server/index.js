@@ -62,7 +62,7 @@ async function startProject(id) {
   if (existing && existing.process.exitCode === null) return { port: existing.port, url: IS_PRODUCTION ? `/api/projects/${id}/preview/` : `http://localhost:${existing.port}`, running: Boolean(existing.ready), starting: !existing.ready, logs: existing.logs.join("").slice(-5000) };
   const port = projectPorts.get(id) || await freePort();
   projectPorts.set(id, port);
-  const child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort", ...(IS_PRODUCTION ? ["--base", `/api/projects/${id}/preview/`] : [])], { cwd: dir, shell: process.platform === "win32", windowsHide: true, detached: process.platform !== "win32", env: { ...safeProjectEnv(), BROWSER: "none" } });
+  const child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort", "--cors", ...(IS_PRODUCTION ? ["--base", `/api/projects/${id}/preview/`] : [])], { cwd: dir, shell: process.platform === "win32", windowsHide: true, detached: process.platform !== "win32", env: { ...safeProjectEnv(), BROWSER: "none" } });
   const state = { process: child, port, logs: [], startedAt: Date.now(), ready: false };
   runningProjects.set(id, state);
   const collect = (chunk) => { state.logs.push(String(chunk)); if (state.logs.length > 100) state.logs.shift(); };
