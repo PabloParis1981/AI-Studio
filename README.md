@@ -1,43 +1,41 @@
 # AI Studio
 
-Tu espacio propio para crear aplicaciones con asistencia de IA, con el código bajo tu control.
+Un entorno de desarrollo asistido por IA, inspirado en Google AI Studio, con **ChatGPT/OpenAI como motor de construcción** y el código de cada proyecto bajo tu control.
 
-## Estado actual
+## Qué incluye
 
-Primera base funcional en construcción:
-- Interfaz de trabajo con explorador de archivos, editor, vista previa HTML y chat.
-- Proyectos y archivos guardados en el servidor.
-- Asistente conectado a OpenAI mediante la API de Responses y herramientas para leer, listar y escribir archivos.
-- La clave de OpenAI se lee desde el entorno del servidor y no se envía al navegador.
+- Espacio de trabajo con explorador de archivos, editor, chat de IA y panel de vista previa.
+- Proyectos React + Vite listos para empezar.
+- El asistente puede inspeccionar, crear y modificar archivos directamente usando herramientas.
+- Ejecución real de cada proyecto mediante su servidor de desarrollo.
+- Instalación automática de dependencias al iniciar por primera vez.
+- Panel de salida del servidor y controles para ejecutar/detener la vista previa.
+- Proyectos guardados en `data/projects`.
+- Integración con OpenAI Responses API; la clave permanece en el servidor.
 
 ## Requisitos
 
-- Node.js 20 o superior
-- Una clave de API de OpenAI con facturación de API habilitada para usar el asistente
+- Node.js 20 o superior.
+- Una clave de API de OpenAI con facturación de API habilitada. La suscripción de ChatGPT no incluye crédito de API.
 
 ## Ejecutar en Windows
 
-1. Descargá o cloná este repositorio.
-2. Abrí una terminal en la carpeta del proyecto.
+1. Cloná o descargá este repositorio.
+2. Abrí una terminal en la carpeta.
 3. Ejecutá `npm install`.
-4. Copiá `.env.example` como `.env` y agregá tu clave en `OPENAI_API_KEY`.
+4. Copiá `.env.example` como `.env` y configurá `OPENAI_API_KEY`.
 5. Ejecutá `npm run dev`.
-6. Abrí la dirección local que muestra Vite (normalmente http://localhost:5173).
+6. Abrí http://localhost:5173.
 
-El servidor de la API usa el puerto 8787 por defecto.
+El servidor de la aplicación usa el puerto 8787 y Vite usa el 5173. Los servidores de vista previa de los proyectos se asignan automáticamente desde el puerto 5180.
 
 ## Seguridad
 
-- No compartas tu clave por el chat.
+- Nunca pegues la clave de API en el chat ni en archivos del proyecto.
 - No subas `.env` a GitHub.
-- Los proyectos creados se guardan en `data/projects`, que está excluida de Git.
+- `.env`, `node_modules`, `dist` y los proyectos locales están excluidos de Git.
+- Esta versión está pensada para ejecutarse localmente. **No la publiques abierta en Internet**: antes hay que agregar autenticación, límites de uso y aislamiento de procesos.
 
-## Próximas etapas
+## Motor de IA
 
-1. Ejecución real de proyectos y vista previa con servidor de desarrollo.
-2. Terminal controlada y salida de ejecución.
-3. Sincronización GitHub por proyecto.
-4. Exportación ZIP y publicación.
-5. Mejoras del editor, historial y gestión de cambios.
-
-La terminal, publicación y sincronización GitHub todavía no están implementadas en esta primera etapa.
+El backend usa la API de OpenAI Responses y herramientas de lectura, escritura, listado y ejecución del proyecto. El modelo se configura con `OPENAI_MODEL` y la clave con `OPENAI_API_KEY`.
