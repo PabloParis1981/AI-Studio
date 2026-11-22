@@ -149,7 +149,7 @@ async function allFiles(id) {
   visit(tree);
   return flat;
 }
-app.get("/api/health", (_req, res) => res.json({ ok: true, service: "ai-studio", model: process.env.OPENAI_MODEL || "gpt-5.4", apiKeyConfigured: Boolean(process.env.OPENAI_API_KEY) }));
+app.get("/api/health", (_req, res) => res.json({ ok: true, service: "ai-studio", model: process.env.OPENAI_MODEL || "gpt-6.2-astra", apiKeyConfigured: Boolean(process.env.OPENAI_API_KEY) }));
 async function studioFilePath(id, filename) {
   const project = projectDir(id);
   const projectStat = await fs.lstat(project);
@@ -366,7 +366,7 @@ app.post("/api/chat", async (req, res) => {
     let previousResponseId;
     let response;
     for (let turn = 0; turn < 6; turn++) {
-      const payload = { model: process.env.OPENAI_MODEL || "gpt-5.4", instructions, input, tools: toolDefinitions, tool_choice: "auto", max_output_tokens: 5000 };
+      const payload = { model: process.env.OPENAI_MODEL || "gpt-6.2-astra", instructions, input, tools: toolDefinitions, tool_choice: "auto", max_output_tokens: 5000 };
       if (previousResponseId) payload.previous_response_id = previousResponseId;
       const upstream = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       const data = await upstream.json();
