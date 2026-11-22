@@ -77,3 +77,8 @@ La API de archivos rechaza rutas que atraviesan enlaces simbólicos, no muestra 
 ### Terminal y atajos
 
 La terminal incluye accesos directos para instalar dependencias (`npm install`), compilar (`npm run build`), ejecutar pruebas (`npm test`) y limpiar la salida. En el editor, `Ctrl+S` guarda el archivo y `Ctrl+Shift+Enter` inicia la vista previa.
+
+
+### Límites de archivos en el servidor
+
+El servidor aplica límites aunque se invoque la API directamente: 2 MB para archivos de texto (tanto lectura como escritura) y 7 MB para archivos binarios. Los límites se validan antes de leer o guardar el contenido, y las pruebas automáticas comprueban los rechazos por tamaño.
