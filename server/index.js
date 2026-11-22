@@ -90,7 +90,13 @@ const filePath = async (id, relative) => {
 };
 async function ensureProject(id, name) {
   const dir = projectDir(id);
-  await fs.mkdir(dir, { recursive: true });
+  try {
+    const stat = await fs.lstat(dir);
+    if (stat.isSymbolicLink() || !stat.isDirectory()) throw new Error("La carpeta del proyecto no es segura.");
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    await fs.mkdir(dir, { recursive: true });
+  }
   const marker = path.join(dir, "index.html");
   try { await fs.access(marker); }
   catch {
