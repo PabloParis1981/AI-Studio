@@ -47,6 +47,21 @@ try {
   assert.equal(health.apiKeyConfigured, false);
   assert.equal(health.providers.openai.configured, false);
   assert.equal(health.providers.gemini.configured, false);
+  const settingsDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-studio-settings-"));
+  const settingsFile = path.join(settingsDir, ".env");
+  try {
+    process.env.AI_STUDIO_ENV_PATH = settingsFile;
+    const savedKey = "AIzaSyExampleTestKey1234567890";
+    const keyResult = await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "gemini", apiKey: savedKey }) });
+    assert.equal(keyResult.ok, true);
+    assert.equal((await fs.readFile(settingsFile, "utf8")).includes(savedKey), true);
+    assert.equal((await call("/api/health")).providers.gemini.configured, true);
+    await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "openai", apiKey: savedKey }) }, 400);
+    await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "gemini", apiKey: "short" }) }, 400);
+  } finally {
+    delete process.env.AI_STUDIO_ENV_PATH;
+    await fs.rm(settingsDir, { recursive: true, force: true });
+  }
   assert.equal(health.providers.gemini.model, "gemini-3.8-flash");
   await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "openai" }) }, 503);
   await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "unknown" }) }, 400);
