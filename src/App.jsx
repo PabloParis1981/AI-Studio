@@ -42,7 +42,9 @@ export default function App() {
   const [error, setError] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [geminiKeyInput, setGeminiKeyInput] = useState("");
+  const [openaiKeyInput, setOpenaiKeyInput] = useState("");
   const [savingGeminiKey, setSavingGeminiKey] = useState(false);
+  const [savingOpenaiKey, setSavingOpenaiKey] = useState(false);
   const chatEnd = useRef(null);
   const zipInput = useRef(null);
   const lastLoadedProject = useRef("");
@@ -246,19 +248,23 @@ export default function App() {
     await request(API + "/projects/" + projectId + "/file", { method: "POST", body: JSON.stringify({ path: name, content: "" }) });
     await loadTree(); await openFile(name);
   }
-  async function saveGeminiKey() {
-    const key = geminiKeyInput.trim();
-    if (!key || savingGeminiKey) return;
-    setSavingGeminiKey(true); setError("");
+  async function saveProviderKey(provider) {
+    const isGemini = provider === "gemini";
+    const key = (isGemini ? geminiKeyInput : openaiKeyInput).trim();
+    const saving = isGemini ? savingGeminiKey : savingOpenaiKey;
+    if (!key || saving) return;
+    (isGemini ? setSavingGeminiKey : setSavingOpenaiKey)(true); setError("");
     try {
-      await request(API + "/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "gemini", apiKey: key }) });
-      setGeminiKeyInput("");
+      await request(API + "/settings/provider-key", { method: "POST", body: JSON.stringify({ provider, apiKey: key }) });
+      (isGemini ? setGeminiKeyInput : setOpenaiKeyInput)("");
       const updatedHealth = await request(API + "/health");
       setHealth(updatedHealth);
-      setProvider("gemini");
+      setProvider(provider);
     } catch (e) { setError(e.message); }
-    finally { setSavingGeminiKey(false); }
+    finally { (isGemini ? setSavingGeminiKey : setSavingOpenaiKey)(false); }
   }
+  async function saveGeminiKey() { return saveProviderKey("gemini"); }
+  async function saveOpenaiKey() { return saveProviderKey("openai"); }
   async function sendMessage() {
     const text = prompt.trim();
     if (!text || busy || !projectId) return;
@@ -362,6 +368,6 @@ export default function App() {
         <div className="chat-composer"><div className="composer-hint">Describí el cambio o la aplicación que querés crear</div><textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }} placeholder="Ej.: Creá una landing page moderna..." rows={3}/><div className="composer-footer"><span><Sparkles size={13}/> {provider === "gemini" ? "Gemini" : "ChatGPT"} puede escribir y ejecutar código</span><button className="send-button" disabled={!prompt.trim() || busy} onClick={sendMessage}><Send size={15}/> Enviar</button></div></div>
       </aside>
     </main>
-    {showSettings && <div className="modal-backdrop" onClick={() => setShowSettings(false)}><div className="settings-modal" onClick={(e) => e.stopPropagation()}><div className="modal-title"><strong>Configuración</strong><button className="icon-button" onClick={() => setShowSettings(false)}><X size={17}/></button></div><div className="setting-row"><Sparkles size={18}/><div><strong>Motores de IA</strong><p>Las claves se guardan únicamente en el archivo privado <code>.env</code> de esta instalación. Nunca se muestran de nuevo ni se envían a GitHub.</p><p>Estado: OpenAI {health?.providers?.openai?.configured ? "conectado" : "sin configurar"} · Gemini {health?.providers?.gemini?.configured ? "conectado" : "sin configurar"}.</p><div className="key-config"><label htmlFor="gemini-api-key">Clave de Gemini</label><input id="gemini-api-key" type="password" autoComplete="new-password" value={geminiKeyInput} onChange={(e) => setGeminiKeyInput(e.target.value)} placeholder="Pegá acá tu clave de Google AI Studio" /><button className="save-button" disabled={!geminiKeyInput.trim() || savingGeminiKey} onClick={saveGeminiKey}>{savingGeminiKey ? "Guardando…" : "Guardar clave de Gemini"}</button></div><p>La clave se guarda localmente en el servidor y queda disponible sin reiniciar AI Studio. La facturación de cada API es independiente.</p></div></div><div className="setting-row"><Github size={18}/><div><strong>Repositorio</strong><p>Este proyecto vive en PabloParis1981/AI-Studio. La sincronización GitHub está en desarrollo.</p><a href="https://github.com/PabloParis1981/AI-Studio" target="_blank" rel="noreferrer">Abrir repositorio ↗</a></div></div></div></div>}
+    {showSettings && <div className="modal-backdrop" onClick={() => setShowSettings(false)}><div className="settings-modal" onClick={(e) => e.stopPropagation()}><div className="modal-title"><strong>Configuración</strong><button className="icon-button" onClick={() => setShowSettings(false)}><X size={17}/></button></div><div className="setting-row"><Sparkles size={18}/><div><strong>Motores de IA</strong><p>Las claves se guardan únicamente en el archivo privado <code>.env</code> de esta instalación. Nunca se muestran de nuevo ni se envían a GitHub.</p><p>Estado: OpenAI {health?.providers?.openai?.configured ? "conectado" : "sin configurar"} · Gemini {health?.providers?.gemini?.configured ? "conectado" : "sin configurar"}.</p><div className="key-config"><label htmlFor="openai-api-key">Clave de OpenAI (ChatGPT)</label><input id="openai-api-key" type="password" autoComplete="new-password" value={openaiKeyInput} onChange={(e) => setOpenaiKeyInput(e.target.value)} placeholder="Pegá acá tu clave de OpenAI API" /><button className="save-button" disabled={!openaiKeyInput.trim() || savingOpenaiKey} onClick={saveOpenaiKey}>{savingOpenaiKey ? "Guardando…" : "Guardar clave de OpenAI"}</button></div><div className="key-config"><label htmlFor="gemini-api-key">Clave de Gemini</label><input id="gemini-api-key" type="password" autoComplete="new-password" value={geminiKeyInput} onChange={(e) => setGeminiKeyInput(e.target.value)} placeholder="Pegá acá tu clave de Google AI Studio" /><button className="save-button" disabled={!geminiKeyInput.trim() || savingGeminiKey} onClick={saveGeminiKey}>{savingGeminiKey ? "Guardando…" : "Guardar clave de Gemini"}</button></div><p>Las claves se guardan localmente en el servidor y quedan disponibles sin reiniciar AI Studio. La facturación de cada API es independiente.</p></div></div><div className="setting-row"><Github size={18}/><div><strong>Repositorio</strong><p>Este proyecto vive en PabloParis1981/AI-Studio. La sincronización GitHub está en desarrollo.</p><a href="https://github.com/PabloParis1981/AI-Studio" target="_blank" rel="noreferrer">Abrir repositorio ↗</a></div></div></div></div>}
   </div>;
 }
