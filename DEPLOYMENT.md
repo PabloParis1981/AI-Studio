@@ -1,26 +1,36 @@
 # Publicar AI Studio de forma privada
 
-Este proyecto se publica en Cloud Run con una contraseña propia y almacenamiento de proyectos en un bucket de Cloud Storage.
+La publicación recomendada es Google Cloud Run con contraseña privada, HTTPS y almacenamiento persistente en Cloud Storage.
 
-## Requisitos
-- Google Cloud CLI instalado en Windows.
-- Un proyecto de Google Cloud con facturación habilitada y permisos para activar servicios, crear buckets y desplegar Cloud Run.
-- La clave Gemini API que se quiera usar en la aplicación.
+## Pasos desde el navegador (sin instalar nada en tu PC)
 
-## Publicación en una sola ejecución (PowerShell)
-Desde la carpeta del repositorio, ejecutá:
+1. Abrí [Google Cloud Shell](https://shell.cloud.google.com/) con la misma cuenta de Google que usás para Cloud.
+2. Seleccioná o creá un proyecto de Google Cloud con facturación habilitada.
+3. En Cloud Shell ejecutá estos comandos:
 
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\deploy-cloud-run.ps1
+```bash
+git clone https://github.com/PabloParis1981/AI-Studio.git
+cd AI-Studio
+bash deploy-cloud-run.sh
 ```
 
-El asistente solicita el ID del proyecto de Google Cloud, la región, una contraseña privada y la clave Gemini. Los secretos se guardan en Secret Manager, no en GitHub ni en los archivos de la aplicación. El servicio usa autenticación por contraseña, HTTPS de Cloud Run y una sola instancia para que las sesiones de terminal/vista previa no salten entre instancias.
+Si el repositorio es privado, primero autenticá GitHub en Cloud Shell y después repetí el `git clone`.
 
-La aplicación solicita usuario y contraseña mediante el diálogo seguro del navegador (el usuario puede ser cualquier texto; la contraseña es la que se configuró). No compartas esa contraseña.
+4. El asistente te va a pedir:
+   - ID del proyecto de Google Cloud (si todavía no está seleccionado).
+   - Región (dejá `southamerica-east1` para São Paulo).
+   - Nombre del bucket donde se guardarán tus proyectos.
+   - Una contraseña privada de al menos 16 caracteres.
+   - Tu clave `GEMINI_API_KEY` (se ingresa de forma oculta).
 
-## Datos y vistas previas
-Los proyectos se guardan en el bucket montado en `/mnt/data/projects`. La vista previa de proyectos Vite se sirve a través del mismo servicio y dentro de un iframe aislado. Las claves de proveedores se configuran como secretos del servicio; la pantalla de configuración local no puede escribir secretos cuando la aplicación está publicada.
+El script activa los servicios necesarios, crea el bucket, guarda la contraseña y la clave Gemini en Secret Manager, asigna permisos al servicio y publica la aplicación. No guarda secretos en GitHub ni en los archivos del proyecto.
+
+## Al terminar
+
+Cloud Run mostrará una URL. Abrila en el navegador: te pedirá la contraseña privada. El nombre de usuario puede ser cualquier texto; usá la contraseña que acabás de crear.
+
+Los proyectos se guardan en el bucket montado en `/mnt/data/projects`. El servicio se configura con una sola instancia para mantener las sesiones de terminal y vista previa dentro de la misma instancia.
 
 ## Costos
-Cloud Run puede escalar a cero, pero Cloud Storage, Secret Manager, compilaciones y uso de Gemini pueden generar cargos. Revisá los precios y límites de tu proyecto de Google Cloud antes de desplegar.
+
+Cloud Run puede escalar a cero, pero Cloud Storage, Secret Manager, compilaciones y uso de Gemini pueden generar cargos. Google Cloud puede requerir una cuenta de facturación activa. Revisá los precios y límites de tu proyecto antes de desplegar.
