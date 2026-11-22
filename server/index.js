@@ -15,6 +15,20 @@ const MAX_BINARY_FILE_BYTES = 7 * 1024 * 1024;
 const runningProjects = new Map();
 const projectPorts = new Map();
 let nextPort = 5180;
+async function terminateProcessTree(child) {
+  if (!child || child.exitCode !== null || !child.pid) return;
+  if (process.platform === "win32") {
+    await new Promise((resolve) => {
+      const killer = spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+      killer.once("error", () => { try { child.kill(); } catch {} resolve(); });
+      killer.once("close", resolve);
+    });
+    return;
+  }
+  try { process.kill(-child.pid, "SIGTERM"); } catch { try { child.kill("SIGTERM"); } catch {} }
+  const forceTimer = setTimeout(() => { try { process.kill(-child.pid, "SIGKILL"); } catch {} }, 1800);
+  forceTimer.unref?.();
+}
 async function freePort() {
   while (nextPort < 6200) {
     const port = nextPort++;
@@ -30,9 +44,9 @@ async function startProject(id) {
   const modulesPath = path.join(dir, "node_modules");
   try { await fs.access(modulesPath); } catch {
     await new Promise((resolve, reject) => {
-      const install = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["install", "--no-audit", "--no-fund"], { cwd: dir, shell: process.platform === "win32", windowsHide: true });
+      const install = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["install", "--no-audit", "--no-fund"], { cwd: dir, shell: process.platform === "win32", windowsHide: true, detached: process.platform !== "win32" });
       let output = "";
-      const timer = setTimeout(() => { install.kill(); reject(new Error("npm install superó el límite de 180 segundos.")); }, 180000);
+      const timer = setTimeout(() => { terminateProcessTree(install); reject(new Error("npm install superó el límite de 180 segundos.")); }, 180000);
       install.stdout.on("data", (d) => { output += d; if (output.length > 12000) output = output.slice(-12000); });
       install.stderr.on("data", (d) => { output += d; if (output.length > 12000) output = output.slice(-12000); });
       install.on("error", (error) => { clearTimeout(timer); reject(error); });
@@ -43,7 +57,7 @@ async function startProject(id) {
   if (existing && existing.process.exitCode === null) return { port: existing.port, url: `http://localhost:${existing.port}`, running: Boolean(existing.ready), starting: !existing.ready, logs: existing.logs.join("").slice(-5000) };
   const port = projectPorts.get(id) || await freePort();
   projectPorts.set(id, port);
-  const child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], { cwd: dir, shell: process.platform === "win32", windowsHide: true, env: { ...process.env, BROWSER: "none" } });
+  const child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], { cwd: dir, shell: process.platform === "win32", windowsHide: true, detached: process.platform !== "win32", env: { ...process.env, BROWSER: "none" } });
   const state = { process: child, port, logs: [], startedAt: Date.now(), ready: false };
   runningProjects.set(id, state);
   const collect = (chunk) => { state.logs.push(String(chunk)); if (state.logs.length > 100) state.logs.shift(); };
@@ -213,7 +227,7 @@ app.post("/api/projects/:id/duplicate", async (req, res) => {
 });
 app.post("/api/projects/:id/run", async (req, res) => { try { res.json(await startProject(req.params.id)); } catch (e) { res.status(400).json({ error: e.message }); } });
 app.get("/api/projects/:id/run", (req, res) => { const state = runningProjects.get(req.params.id); const alive = Boolean(state && state.process.exitCode === null); res.json(state ? { running: alive && Boolean(state.ready), starting: alive && !state.ready, port: state.port, url: `http://localhost:${state.port}`, logs: state.logs.join("").slice(-8000) } : { running: false, starting: false, logs: "" }); });
-app.post("/api/projects/:id/stop", (req, res) => { const state = runningProjects.get(req.params.id); if (state) { state.process.kill(); runningProjects.delete(req.params.id); } res.json({ ok: true }); });
+app.post("/api/projects/:id/stop", async (req, res) => { const state = runningProjects.get(req.params.id); if (state) { await terminateProcessTree(state.process); runningProjects.delete(req.params.id); } res.json({ ok: true }); });
 app.get("/api/projects/:id/conversation", async (req, res) => {
   try {
     const dir = await ensureProject(req.params.id);
@@ -236,12 +250,12 @@ async function executeTerminal(id, command) {
   const shell = process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : process.env.SHELL || "/bin/bash";
   const args = process.platform === "win32" ? ["/d", "/s", "/c", command] : ["-lc", command];
   return await new Promise((resolve, reject) => {
-    const child = spawn(shell, args, { cwd, windowsHide: true, env: { ...process.env, BROWSER: "none", FORCE_COLOR: "0" } });
+    const child = spawn(shell, args, { cwd, windowsHide: true, detached: process.platform !== "win32", env: { ...process.env, BROWSER: "none", FORCE_COLOR: "0" } });
     let output = "";
     let timedOut = false;
     const append = (chunk) => { output += String(chunk); if (output.length > 24000) output = output.slice(-24000); };
     child.stdout.on("data", append); child.stderr.on("data", append);
-    const timer = setTimeout(() => { timedOut = true; child.kill(); }, 180000);
+    const timer = setTimeout(() => { timedOut = true; terminateProcessTree(child); }, 180000);
     child.on("error", (error) => { clearTimeout(timer); reject(error); });
     child.on("close", (code) => { clearTimeout(timer); resolve({ command, output, exitCode: code, timedOut }); });
   });
