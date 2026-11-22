@@ -16,7 +16,7 @@ const port = server.address().port;
 await new Promise((resolve) => server.close(resolve));
 const child = spawn(process.execPath, ["server/index.js"], {
   cwd: ROOT,
-  env: { ...process.env, PORT: String(port), OPENAI_API_KEY: "", GEMINI_API_KEY: "", AI_STUDIO_ENV_PATH: settingsFile },
+  env: { ...process.env, PORT: String(port), OPENAI_API_KEY: "", GEMINI_API_KEY: "", AI_STUDIO_ENV_PATH: settingsFile, AI_STUDIO_TEST_SECRET: "must-not-reach-project-process" },
   stdio: ["ignore", "pipe", "pipe"]
 });
 let logs = "";
@@ -96,6 +96,12 @@ try {
   const created = await call("/api/projects", { method: "POST", body: JSON.stringify({ name: "Smoke Test" }) });
   const id = created.project.id;
   createdIds.push(id);
+  const secretCheck = await call(`/api/projects/${id}/terminal`, {
+    method: "POST",
+    body: JSON.stringify({ command: 'node -e "console.log(process.env.AI_STUDIO_TEST_SECRET || \'missing\')"' })
+  });
+  assert.match(secretCheck.output, /missing/);
+  assert.doesNotMatch(secretCheck.output, /must-not-reach-project-process/);
   await call(`/api/projects/${id}/file`, { method: "PUT", body: JSON.stringify({ path: "src/check.txt", content: "AI Studio smoke test" }) });
   await call(`/api/projects/${id}/file`, { method: "PUT", body: JSON.stringify({ path: ".env.example", content: "OPENAI_API_KEY=replace-me" }) });
   const textFile = await call(`/api/projects/${id}/file?path=src%2Fcheck.txt`);
