@@ -38,11 +38,11 @@ async function startProject(id) {
     });
   }
   const existing = runningProjects.get(id);
-  if (existing && existing.process.exitCode === null) return { port: existing.port, url: `http://localhost:${existing.port}`, running: true };
+  if (existing && existing.process.exitCode === null) return { port: existing.port, url: `http://localhost:${existing.port}`, running: Boolean(existing.ready), starting: !existing.ready, logs: existing.logs.join("").slice(-5000) };
   const port = projectPorts.get(id) || await freePort();
   projectPorts.set(id, port);
   const child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], { cwd: dir, shell: process.platform === "win32", windowsHide: true, env: { ...process.env, BROWSER: "none" } });
-  const state = { process: child, port, logs: [], startedAt: Date.now() };
+  const state = { process: child, port, logs: [], startedAt: Date.now(), ready: false };
   runningProjects.set(id, state);
   const collect = (chunk) => { state.logs.push(String(chunk)); if (state.logs.length > 100) state.logs.shift(); };
   child.stdout.on("data", collect); child.stderr.on("data", collect);
@@ -52,7 +52,7 @@ async function startProject(id) {
   while (Date.now() < deadline && child.exitCode === null) {
     try {
       const response = await fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(900) });
-      if (response.ok) { ready = true; break; }
+      if (response.ok) { ready = true; state.ready = true; break; }
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, 350));
   }
@@ -165,7 +165,7 @@ app.post("/api/projects/:id/duplicate", async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.post("/api/projects/:id/run", async (req, res) => { try { res.json(await startProject(req.params.id)); } catch (e) { res.status(400).json({ error: e.message }); } });
-app.get("/api/projects/:id/run", (req, res) => { const state = runningProjects.get(req.params.id); res.json(state ? { running: state.process.exitCode === null, port: state.port, url: `http://localhost:${state.port}`, logs: state.logs.join("").slice(-8000) } : { running: false, logs: "" }); });
+app.get("/api/projects/:id/run", (req, res) => { const state = runningProjects.get(req.params.id); const alive = Boolean(state && state.process.exitCode === null); res.json(state ? { running: alive && Boolean(state.ready), starting: alive && !state.ready, port: state.port, url: `http://localhost:${state.port}`, logs: state.logs.join("").slice(-8000) } : { running: false, starting: false, logs: "" }); });
 app.post("/api/projects/:id/stop", (req, res) => { const state = runningProjects.get(req.params.id); if (state) { state.process.kill(); runningProjects.delete(req.params.id); } res.json({ ok: true }); });
 app.get("/api/projects/:id/conversation", async (req, res) => {
   try {
