@@ -83,12 +83,12 @@ export default function App() {
   useEffect(() => {
     if (!projectId) return;
     let active = true;
-    request(API + "/projects/" + projectId + "/conversation").then((data) => {
-      if (active) { setMessages(data.messages?.length ? data.messages : [{ role: "assistant", content: "¡Hola! Elegí ChatGPT u Gemini y contame qué querés construir. Puedo crear y modificar archivos directamente en tu proyecto." }]); setProvider(data.provider || "openai"); setModelChoice(data.model || ""); }
+    request(API + "/projects/" + projectId + "/conversation?provider=" + provider).then((data) => {
+      if (active) { setMessages(data.messages?.length ? data.messages : [{ role: "assistant", content: "¡Hola! Elegí ChatGPT o Gemini y contame qué querés construir. Puedo crear y modificar archivos directamente en tu proyecto." }]); setModelChoice(data.model || ""); }
     }).catch((e) => { if (active) setError(e.message); });
     setTerminalHistory([]); setRunInfo({ running: false, url: "", logs: "" });
     return () => { active = false; };
-  }, [projectId]);
+  }, [projectId, provider]);
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, busy]);
   useEffect(() => {
     if (saved || !activeFile || !projectId) return;
@@ -255,7 +255,7 @@ export default function App() {
       if (data.model) setModelChoice(data.model);
       const updatedMessages = [...messages, { role: "user", content: text }, { role: "assistant", content: data.answer }];
       setMessages(updatedMessages);
-      await request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: updatedMessages, provider, model: modelChoice }) }).catch(() => {});
+      await request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: updatedMessages, provider, model: data.model || modelChoice }) }).catch(() => {});
       try {
         await loadTree();
         const current = activeFile || "index.html";
@@ -264,7 +264,7 @@ export default function App() {
         setError("La respuesta se completó, pero no pude actualizar el explorador: " + refreshError.message);
       }
       setTab("preview");
-    } catch (e) { const updatedMessages = [...messages, { role: "user", content: text }, { role: "assistant", content: "No pude completar el pedido: " + e.message }]; setMessages(updatedMessages); request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: updatedMessages }) }).catch(() => {}); }
+    } catch (e) { const updatedMessages = [...messages, { role: "user", content: text }, { role: "assistant", content: "No pude completar el pedido: " + e.message }]; setMessages(updatedMessages); request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: updatedMessages, provider, model: modelChoice }) }).catch(() => {}); }
     finally { setBusy(false); }
   }
   const refreshPreview = async () => {
