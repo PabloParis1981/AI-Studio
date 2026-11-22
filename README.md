@@ -59,3 +59,6 @@ El código fuente de AI Studio está versionado en este repositorio. La sincroni
 - Duplicar proyectos para crear una copia independiente de sus archivos.
 - Las copias excluyen dependencias instaladas, compilaciones y el historial interno de conversación.
 - Los archivos de configuración seguros `.gitignore` y `.env.example` se conservan en el explorador y en las exportaciones.
+
+
+La importación y duplicación conservan configuraciones de desarrollo habituales (`.gitignore`, `.env.example`, `.github`, `.vscode` y `.husky`) y excluyen `.env`, credenciales, dependencias y carpetas de compilación.
