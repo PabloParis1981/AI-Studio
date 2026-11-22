@@ -514,7 +514,18 @@ app.post("/api/chat", async (req, res) => {
       ? await runGemini({ apiKey: configuredKey, model, projectId, message: String(message).slice(0, 12000), history: safeHistory })
       : await runOpenAI({ apiKey: configuredKey, model, projectId, message: String(message).slice(0, 12000), history: safeHistory });
     res.json({ answer, provider, model, files: await allFiles(projectId) });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (error) {
+    let message = error?.message || error?.error?.message || error?.response?.data?.error?.message;
+    if (!message && typeof error === "string") message = error;
+    if (!message) {
+      try { message = JSON.stringify(error); } catch {}
+    }
+    if (!message || message === "{}") message = "Gemini no devolvió un mensaje de error legible. Revisá la configuración de la API y los permisos de la clave.";
+    const safeMessage = String(message).replaceAll(configuredKey, "[API key oculta]");
+    const status = error?.status || error?.statusCode || error?.response?.status || "sin estado";
+    console.error(`[AI Studio] Error en proveedor ${provider} (HTTP ${status}): ${safeMessage}`);
+    res.status(500).json({ error: safeMessage });
+  }
 });
 
 const dist = path.join(ROOT, "dist");
