@@ -13,43 +13,39 @@ const probe = net.createServer();
 await new Promise((resolve, reject) => probe.listen(0, "127.0.0.1", resolve).once("error", reject));
 const port = probe.address().port;
 await new Promise((resolve) => probe.close(resolve));
-const password = "production-test-password-2026";
 const child = spawn(process.execPath, ["server/index.js"], {
   cwd: ROOT,
-  env: { ...process.env, APP_ENV: "production", NODE_ENV: "production", APP_PASSWORD: password, DATA_DIR: dataDir, PORT: String(port), HOST: "127.0.0.1", GEMINI_API_KEY: "", OPENAI_API_KEY: "" },
+  env: { ...process.env, APP_ENV: "production", NODE_ENV: "production", DATA_DIR: dataDir, PORT: String(port), HOST: "127.0.0.1", GEMINI_API_KEY: "", OPENAI_API_KEY: "" },
   stdio: ["ignore", "pipe", "pipe"]
 });
 let logs = "";
 child.stdout.on("data", (chunk) => { logs += String(chunk); });
 child.stderr.on("data", (chunk) => { logs += String(chunk); });
 const base = `http://127.0.0.1:${port}`;
-const auth = "Basic " + Buffer.from("owner:" + password).toString("base64");
 try {
   let ready = false;
   for (let i = 0; i < 60; i++) {
     if (child.exitCode !== null) throw new Error("Production server exited: " + logs);
-    try { const r = await fetch(base + "/api/health"); if (r.status === 401) { ready = true; break; } } catch {}
+    try { const r = await fetch(base + "/api/health"); if (r.status === 200) { ready = true; break; } } catch {}
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   assert.ok(ready, "Production server did not start. " + logs);
-  assert.equal((await fetch(base + "/api/health")).status, 401);
-  assert.equal((await fetch(base + "/api/health", { headers: { Authorization: auth } })).status, 200);
-  assert.equal((await fetch(base + "/api/health", { headers: { Authorization: "Basic " + Buffer.from("owner:wrong-password").toString("base64") } })).status, 401);
+  assert.equal((await fetch(base + "/api/health")).status, 200);
   const blockedKeyWrite = await fetch(base + "/api/settings/provider-key", {
     method: "POST",
-    headers: { Authorization: auth, "Content-Type": "application/json", Origin: base },
+    headers: { "Content-Type": "application/json", Origin: base },
     body: JSON.stringify({ provider: "gemini", apiKey: "AIzaSyExampleTestKey1234567890" })
   });
   assert.equal(blockedKeyWrite.status, 403);
   const created = await fetch(base + "/api/projects", {
     method: "POST",
-    headers: { Authorization: auth, "Content-Type": "application/json", Origin: base },
+    headers: { "Content-Type": "application/json", Origin: base },
     body: JSON.stringify({ name: "Persistencia Producción" })
   });
   assert.equal(created.status, 200);
   const payload = await created.json();
   assert.ok(await fs.stat(path.join(dataDir, payload.project.id)));
-  console.log("Production smoke tests OK: password challenge, authorized access, wrong-password rejection, provider keys locked to Secret Manager, and configurable persistent data directory.");
+  console.log("Production smoke tests OK: public personal access, provider keys locked to Secret Manager, and configurable persistent data directory.");
 } finally {
   if (child.exitCode === null) {
     await new Promise((resolve) => { child.once("exit", resolve); child.kill(); });
