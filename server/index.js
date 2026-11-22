@@ -81,7 +81,7 @@ app.use(express.json({ limit: "12mb" }));
 // This IDE executes project commands and stores provider keys, so its API is loopback-only.
 function isLoopbackAddress(address) {
   const value = String(address || "").toLowerCase().replace(/^::ffff:/, "");
-  return value === "::1" || value === "127.0.0.1" || /^127\\./.test(value);
+  return value === "::1" || value === "127.0.0.1" || /^127\./.test(value);
 }
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 function safeProjectEnv() {
