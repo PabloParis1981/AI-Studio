@@ -68,6 +68,11 @@ export default function App() {
   }
   useEffect(() => { loadProjects().catch((e) => setError(e.message)); }, []);
   useEffect(() => { if (projectId) loadTree(projectId).catch((e) => setError(e.message)); }, [projectId]);
+  useEffect(() => {
+    if (!projectId) return;
+    request(API + "/projects/" + projectId + "/conversation").then((data) => setMessages(data.messages?.length ? data.messages : [{ role: "assistant", content: "¡Hola! Soy ChatGPT, tu asistente de desarrollo. Contame qué querés construir y puedo crear o modificar archivos directamente en tu proyecto." }])).catch((e) => setError(e.message));
+    setTerminalHistory([]); setRunInfo({ running: false, url: "", logs: "" });
+  }, [projectId]);
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, busy]);
   async function runProject() {
     setBusy(true); setError(""); setTab("preview");
@@ -129,12 +134,14 @@ export default function App() {
     setPrompt(""); setMessages((m) => [...m, { role: "user", content: text }]); setBusy(true); setError("");
     try {
       const data = await request(API + "/chat", { method: "POST", body: JSON.stringify({ projectId, message: text, history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })) }) });
-      setMessages((m) => [...m, { role: "assistant", content: data.answer }]);
+      const updatedMessages = [...messages, { role: "user", content: text }, { role: "assistant", content: data.answer }];
+      setMessages(updatedMessages);
+      await request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: updatedMessages }) });
       await loadTree();
       const current = activeFile || "index.html";
       try { await openFile(current); } catch {}
       setTab("preview");
-    } catch (e) { setMessages((m) => [...m, { role: "assistant", content: "No pude completar el pedido: " + e.message }]); }
+    } catch (e) { const updatedMessages = [...messages, { role: "user", content: text }, { role: "assistant", content: "No pude completar el pedido: " + e.message }]; setMessages(updatedMessages); request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: updatedMessages }) }).catch(() => {}); }
     finally { setBusy(false); }
   }
   const refreshPreview = async () => {
