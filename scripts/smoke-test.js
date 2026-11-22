@@ -10,6 +10,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = path.join(ROOT, "data", "projects");
 const settingsDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-studio-settings-"));
 const settingsFile = path.join(settingsDir, ".env");
+const settingsDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-studio-settings-"));
+const settingsFile = path.join(settingsDir, ".env");
 const server = net.createServer();
 await new Promise((resolve, reject) => server.listen(0, "127.0.0.1", resolve).once("error", reject));
 const port = server.address().port;
@@ -49,10 +51,6 @@ try {
   assert.equal(health.apiKeyConfigured, false);
   assert.equal(health.providers.openai.configured, false);
   assert.equal(health.providers.gemini.configured, false);
-  const settingsDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-studio-settings-"));
-  const settingsFile = path.join(settingsDir, ".env");
-  try {
-    process.env.AI_STUDIO_ENV_PATH = settingsFile;
     const savedKey = "AIzaSyExampleTestKey1234567890";
     const keyResult = await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "gemini", apiKey: savedKey }) });
     assert.equal(keyResult.ok, true);
@@ -60,10 +58,6 @@ try {
     assert.equal((await call("/api/health")).providers.gemini.configured, true);
     await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "openai", apiKey: savedKey }) }, 400);
     await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "gemini", apiKey: "short" }) }, 400);
-  } finally {
-    delete process.env.AI_STUDIO_ENV_PATH;
-    await fs.rm(settingsDir, { recursive: true, force: true });
-  }
   assert.equal(health.providers.gemini.model, "gemini-3.8-flash");
   await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "openai" }) }, 503);
   await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "unknown" }) }, 400);
@@ -137,4 +131,5 @@ try {
 } finally {
   child.kill();
   await Promise.all(createdIds.map((id) => fs.rm(path.join(DATA, id), { recursive: true, force: true }).catch(() => {})));
+  await fs.rm(settingsDir, { recursive: true, force: true });
 }
