@@ -160,7 +160,7 @@ async function readProjectName(id) {
     const target = await studioFilePath(id, "project.json");
     const meta = JSON.parse(await fs.readFile(target, "utf8"));
     if (typeof meta.name === "string" && meta.name.trim()) return meta.name;
-  } catch (error) { if (error.code !== "ENOENT") throw error; }
+  } catch {}
   return id.replace(/-/g, " ").replace(/\\b\\w/g, (c) => c.toUpperCase());
 }
 async function writeProjectName(id, name) {
