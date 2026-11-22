@@ -41,6 +41,8 @@ export default function App() {
   const chatEnd = useRef(null);
   const zipInput = useRef(null);
   const lastLoadedProject = useRef("");
+  const editorSnapshot = useRef({ projectId, activeFile, code });
+  editorSnapshot.current = { projectId, activeFile, code };
   const project = projects.find((p) => p.id === projectId);
   const previewDoc = useMemo(() => {
     if (activeFile.endsWith(".html")) return code;
@@ -84,8 +86,10 @@ export default function App() {
     if (saved || !activeFile || !projectId) return;
     const timer = setTimeout(async () => {
       try {
-        await request(API + "/projects/" + projectId + "/file", { method: "PUT", body: JSON.stringify({ path: activeFile, content: code }) });
-        setSaved(true);
+        const snapshot = { projectId, activeFile, code };
+        await request(API + "/projects/" + snapshot.projectId + "/file", { method: "PUT", body: JSON.stringify({ path: snapshot.activeFile, content: snapshot.code }) });
+        const latest = editorSnapshot.current;
+        if (latest.projectId === snapshot.projectId && latest.activeFile === snapshot.activeFile && latest.code === snapshot.code) setSaved(true);
       } catch (e) { setError("No se pudo guardar automáticamente: " + e.message); }
     }, 900);
     return () => clearTimeout(timer);
@@ -118,10 +122,12 @@ export default function App() {
   async function stopProject() { try { await request(API + "/projects/" + projectId + "/stop", { method: "POST" }); setRunInfo({ running: false, url: "", logs: "" }); } catch (e) { setError(e.message); } }
   async function saveFile() {
     if (!activeFile || !projectId) return;
-    await request(API + "/projects/" + projectId + "/file", { method: "PUT", body: JSON.stringify({ path: activeFile, content: code }) });
-    setSaved(true);
-    if (activeFile.endsWith(".html")) setPreview(code);
-    await loadTree();
+    const snapshot = { projectId, activeFile, code };
+    await request(API + "/projects/" + snapshot.projectId + "/file", { method: "PUT", body: JSON.stringify({ path: snapshot.activeFile, content: snapshot.code }) });
+    const latest = editorSnapshot.current;
+    if (latest.projectId === snapshot.projectId && latest.activeFile === snapshot.activeFile && latest.code === snapshot.code) setSaved(true);
+    if (snapshot.activeFile.endsWith(".html")) setPreview(snapshot.code);
+    await loadTree(snapshot.projectId);
   }
   async function exportProject() {
     if (!projectId) return;
