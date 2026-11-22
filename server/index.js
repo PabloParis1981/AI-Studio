@@ -59,7 +59,7 @@ async function startProject(id) {
   return { port, url: `http://localhost:${port}`, running: child.exitCode === null && ready, starting: child.exitCode === null && !ready, logs: state.logs.join("").slice(-5000) };
 }
 
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json({ limit: "12mb" }));
 
 const safeId = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 48) || "project";
 const projectDir = (id) => {
@@ -203,6 +203,17 @@ app.post("/api/projects/:id/file", async (req, res) => {
     try { await fs.access(target); return res.status(409).json({ error: "El archivo ya existe" }); } catch {}
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, String(req.body?.content ?? ""), "utf8");
+    res.json({ ok: true, path: relative });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.post("/api/projects/:id/file-binary", async (req, res) => {
+  try {
+    const relative = String(req.body?.path || "");
+    const encoded = String(req.body?.contentBase64 || "");
+    if (!relative || relative.length > 240 || encoded.length > 10_000_000) return res.status(400).json({ error: "Archivo binario inválido o demasiado grande." });
+    const target = filePath(req.params.id, relative);
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(target, Buffer.from(encoded, "base64"));
     res.json({ ok: true, path: relative });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
