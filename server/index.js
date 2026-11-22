@@ -415,19 +415,20 @@ async function runGemini({ apiKey, model, projectId, message, history }) {
   const tools = toolDefinitions.map(({ name, description, parameters }) => ({ type: "function", name, description, parameters }));
   let interaction = await ai.interactions.create({ model, input: transcript, system_instruction: assistantInstructions, tools });
   for (let turn = 0; turn < 8; turn++) {
-    const calls = (interaction.outputs || []).filter((item) => item.type === "function_call");
+    const steps = interaction.steps || interaction.outputs || [];
+    const calls = steps.filter((item) => item.type === "function_call");
     if (!calls.length) break;
     const results = [];
     for (const call of calls) {
       let result;
       try { result = await runTool(projectId, call.name, call.arguments || {}); }
       catch (e) { result = JSON.stringify({ error: e.message }); }
-      results.push({ type: "function_result", name: call.name, call_id: call.id, result: String(result).slice(0, 30000) });
+      results.push({ type: "function_result", name: call.name, call_id: call.id, result: [{ type: "text", text: String(result).slice(0, 30000) }] });
     }
-    interaction = await ai.interactions.create({ model, previous_interaction_id: interaction.id, input: results });
+    interaction = await ai.interactions.create({ model, previous_interaction_id: interaction.id, input: results, tools });
   }
-  const outputs = interaction.outputs || [];
-  const answer = outputs.filter((item) => item.type === "text" || item.type === "message").flatMap((item) => item.content || []).map((part) => part.text || "").filter(Boolean).join("\n");
+  const outputs = interaction.steps || interaction.outputs || [];
+  const answer = interaction.output_text || outputs.filter((item) => item.type === "model_output" || item.type === "message" || item.type === "text").flatMap((item) => item.content || []).map((part) => part.text || "").filter(Boolean).join("\n");
   return answer || outputs.map((item) => item.text || "").filter(Boolean).join("\n") || "Terminé de procesar la solicitud.";
 }
 app.post("/api/chat", async (req, res) => {
