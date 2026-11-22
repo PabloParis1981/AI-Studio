@@ -13,7 +13,8 @@ Un entorno de desarrollo asistido por IA inspirado en Google AI Studio. En lugar
 - Vista previa en vivo que espera a que el servidor responda antes de marcarse como iniciada.
 - Protección de cambios sin guardar al ejecutar la aplicación o cambiar de proyecto.
 - Terminal interactiva para ejecutar comandos dentro de la carpeta del proyecto.
-- Exportación del proyecto completo a un archivo ZIP.
+- Importación y exportación ZIP del proyecto, con soporte para recursos binarios y exclusión de archivos sensibles.
+- La vista previa consulta el estado del servidor cuando tarda más de lo habitual.
 - Archivos y proyectos guardados localmente en `data/projects`.
 
 ## Requisitos
