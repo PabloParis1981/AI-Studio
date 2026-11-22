@@ -145,7 +145,7 @@ async function executeTerminal(id, command) {
     let timedOut = false;
     const append = (chunk) => { output += String(chunk); if (output.length > 24000) output = output.slice(-24000); };
     child.stdout.on("data", append); child.stderr.on("data", append);
-    const timer = setTimeout(() => { timedOut = true; child.kill(); }, 60000);
+    const timer = setTimeout(() => { timedOut = true; child.kill(); }, 180000);
     child.on("error", (error) => { clearTimeout(timer); reject(error); });
     child.on("close", (code) => { clearTimeout(timer); resolve({ command, output, exitCode: code, timedOut }); });
   });
@@ -199,7 +199,7 @@ app.delete("/api/projects/:id/file", async (req, res) => {
 });
 
 const toolDefinitions = [
-  { type: "function", name: "run_terminal_command", description: "Execute a shell command in the current project directory. Use npm install, npm run build, tests and diagnostics. Commands have a 60 second limit.", parameters: { type: "object", properties: { command: { type: "string" } }, required: ["command"], additionalProperties: false }, strict: true },
+  { type: "function", name: "run_terminal_command", description: "Execute a shell command in the current project directory. Use npm install, npm run build, tests and diagnostics. Commands have a 180 second limit.", parameters: { type: "object", properties: { command: { type: "string" } }, required: ["command"], additionalProperties: false }, strict: true },
   { type: "function", name: "delete_project_file", description: "Delete a file from the current project when the user requests removal or a generated file is no longer needed.", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false }, strict: true },
   { type: "function", name: "run_project", description: "Install project dependencies if needed and start its Vite development server for a live preview. Use after building or changing a web app.", parameters: { type: "object", properties: {}, required: [], additionalProperties: false }, strict: true },
   { type: "function", name: "list_project_files", description: "List all files in the current project.", parameters: { type: "object", properties: {}, required: [], additionalProperties: false }, strict: true },
