@@ -36,18 +36,25 @@ Un entorno de desarrollo asistido por IA inspirado en Google AI Studio. Permite 
 
 ## Configuración
 
-- `OPENAI_API_KEY`: clave privada de API, solo en el servidor.
-- `OPENAI_MODEL`: modelo de OpenAI a utilizar.\n- `GEMINI_API_KEY`: clave privada de Gemini API, solo en el servidor. También podés guardarla desde Configuración; se escribe en el `.env` local y no se devuelve al navegador.
-- `OPENAI_API_KEY`: clave privada de OpenAI API, solo en el servidor. También podés guardarla desde Configuración; se escribe en el `.env` local y no se devuelve al navegador.\n- `GEMINI_MODEL`: modelo de Gemini (por defecto `gemini-3.8-flash`).\n\nEn el panel del chat podés elegir el proveedor y el modelo para cada proyecto/conversación. El selector informa si falta configurar la clave. Las conversaciones guardan la selección y las claves nunca se envían al navegador.
+- `OPENAI_API_KEY`: clave privada de OpenAI API, solo en el servidor.
+- `OPENAI_MODEL`: modelo de OpenAI a utilizar.
+- `GEMINI_API_KEY`: clave privada de Gemini API, solo en el servidor.
+- `GEMINI_MODEL`: modelo de Gemini (por defecto `gemini-3.8-flash`).
 - `PORT`: puerto del servidor (3000 por defecto).
+
+También podés guardar las claves desde Configuración dentro de la aplicación. Se escriben en el archivo `.env` local, con permisos privados en sistemas compatibles, y nunca se devuelven al navegador. La facturación de las API es independiente de una suscripción a ChatGPT o Google AI Studio.
+
+En el panel del chat podés elegir el proveedor y el modelo para cada conversación. El selector informa si falta configurar la clave.
 
 ## Seguridad
 
 - No pegues claves privadas en el chat ni en archivos del proyecto.
 - No subas `.env` a GitHub.
-- Los servidores locales escuchan en loopback y no están pensados para exponerse a Internet.
-- La terminal ejecuta comandos dentro de la carpeta del proyecto. Usala solo con proyectos y dependencias de confianza.
-- Antes de desplegar este entorno para varios usuarios, hay que implementar autenticación, límites de uso y aislamiento de procesos.
+- El servidor valida que las conexiones provengan del equipo local y rechaza nombres de host ajenos (protección frente a DNS rebinding).
+- Las operaciones que modifican datos rechazan orígenes web externos y solicitudes marcadas como cross-site.
+- Las claves y otras variables con nombres sensibles se excluyen del entorno heredado por los procesos de proyectos.
+- La terminal y los scripts de los proyectos se ejecutan con los permisos de tu cuenta del sistema. Esto **no es un sandbox**: un proyecto o una dependencia no confiable podría leer o modificar otros archivos a los que tu usuario tenga acceso. Ejecutá únicamente código y dependencias de confianza.
+- No publiques ni expongas este servidor en una red o en Internet. Antes de habilitar acceso remoto o multiusuario hacen falta autenticación, aislamiento real de procesos, límites de recursos y una revisión de seguridad específica.
 
 ## Integración GitHub
 
