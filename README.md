@@ -67,3 +67,8 @@ La importación y duplicación conservan configuraciones de desarrollo habituale
 ### Pruebas automáticas
 
 Ejecutá `npm test` para comprobar la API local: creación, lectura y escritura de proyectos, recursos binarios, historial, renombrado, duplicación, exclusión de `.env` y protección contra rutas fuera del proyecto. GitHub Actions ejecuta estas pruebas junto con la compilación en cada push a `main`.
+
+
+### Seguridad del espacio de trabajo
+
+La API de archivos rechaza rutas que atraviesan enlaces simbólicos, no muestra enlaces simbólicos en el explorador y no permite usar una carpeta de proyecto que sea un enlace simbólico. Las pruebas automáticas cubren estos casos. El servidor sigue diseñado para uso local: no lo publiques directamente en Internet sin autenticación, aislamiento de procesos y límites de recursos.
