@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import net from "node:net";
+import http from "node:http";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -50,7 +51,15 @@ try {
   assert.equal(health.providers.openai.configured, false);
   assert.equal(health.providers.gemini.configured, false);
   assert.equal(health.providers.gemini.model, "gemini-3.8-flash");
-  await call("/api/health", { headers: { Host: "attacker.example" } }, 403);
+  const hostileHostStatus = await new Promise((resolve, reject) => {
+    const request = http.request({ host: "127.0.0.1", port, path: "/api/health", headers: { Host: "attacker.example" } }, (response) => {
+      response.resume();
+      resolve(response.statusCode);
+    });
+    request.once("error", reject);
+    request.end();
+  });
+  assert.equal(hostileHostStatus, 403);
   await call("/api/settings/provider-key", {
     method: "POST",
     headers: { Origin: "https://attacker.example" },
