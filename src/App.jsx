@@ -270,6 +270,21 @@ export default function App() {
       setPreview(data.content); setTab("preview");
     } catch (e) { setError(e.message); }
   };
+  useEffect(() => {
+    const onShortcut = (event) => {
+      if (!(event.ctrlKey || event.metaKey)) return;
+      if (event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        if (!busy) saveFile().catch((e) => setError(e.message));
+      }
+      if (event.key === "Enter" && event.shiftKey) {
+        event.preventDefault();
+        if (!busy && !terminalBusy) runProject();
+      }
+    };
+    window.addEventListener("keydown", onShortcut);
+    return () => window.removeEventListener("keydown", onShortcut);
+  }, [projectId, activeFile, code, saved, busy, terminalBusy]);
   return <div className="app-shell">
     <header className="topbar">
       <div className="brand"><div className="brand-mark"><Sparkles size={18}/></div><div><strong>AI Studio</strong><small>Tu espacio de creación</small></div></div>
@@ -285,7 +300,7 @@ export default function App() {
         <div className="sidebar-bottom"><div className="side-status"><Activity size={14}/> Espacio local del proyecto</div><div className="side-status"><Activity size={14}/> Archivos guardados en este equipo</div></div>
       </aside>
       <section className="center-panel">
-        <div className="panel-tabs"><div className="editor-tab"><Code2 size={15}/><span>{activeFile || "Editor"}</span>{!saved && <i className="unsaved-dot"/>}</div><div className="editor-actions"><span className="language-tag">{activeFile.split(".").pop() || "code"}</span><button className="save-button" onClick={() => saveFile().catch((e) => setError(e.message))}>Guardar</button>{activeFile && <button className="save-button danger-button" title="Eliminar archivo" onClick={() => deleteActiveFile().catch((e) => setError(e.message))}><Trash2 size={12}/></button>}<button className="save-button" onClick={runProject}><Play size={12}/> Ejecutar</button></div></div>
+        <div className="panel-tabs"><div className="editor-tab"><Code2 size={15}/><span>{activeFile || "Editor"}</span>{!saved && <i className="unsaved-dot"/>}</div><div className="editor-actions"><span className="language-tag">{activeFile.split(".").pop() || "code"}</span><button className="save-button" title="Guardar · Ctrl+S" onClick={() => saveFile().catch((e) => setError(e.message))}>Guardar</button>{activeFile && <button className="save-button danger-button" title="Eliminar archivo" onClick={() => deleteActiveFile().catch((e) => setError(e.message))}><Trash2 size={12}/></button>}<button className="save-button" title="Ejecutar · Ctrl+Shift+Enter" onClick={runProject}><Play size={12}/> Ejecutar</button></div></div>
         <div className="editor-wrap"><textarea className="code-editor" spellCheck="false" value={code} onChange={(e) => { setCode(e.target.value); setSaved(false); }} placeholder="Seleccioná un archivo para empezar a editar..."/></div>
         <div className="bottom-panel">
           <div className="bottom-tabs"><button className={tab === "preview" ? "active" : ""} onClick={() => setTab("preview")}><Monitor size={14}/> Vista previa</button><button className={tab === "terminal" ? "active" : ""} onClick={() => setTab("terminal")}><Terminal size={14}/> Terminal</button></div>
