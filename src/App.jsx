@@ -81,7 +81,7 @@ export default function App() {
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, busy]);
   async function runProject() {
     setBusy(true); setError(""); setTab("preview");
-    try { const data = await request(API + "/projects/" + projectId + "/run", { method: "POST" }); setRunInfo(data); if (!data.running) setError(data.logs || "No se pudo iniciar la vista previa."); }
+    try { if (!saved) await saveFile(); const data = await request(API + "/projects/" + projectId + "/run", { method: "POST" }); setRunInfo(data); if (!data.running) setError(data.logs || "No se pudo iniciar la vista previa."); }
     catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
@@ -144,6 +144,7 @@ export default function App() {
     if (!text || busy || !projectId) return;
     setPrompt(""); setMessages((m) => [...m, { role: "user", content: text }]); setBusy(true); setError("");
     try {
+      if (!saved) await saveFile();
       const pendingMessages = [...messages, { role: "user", content: text }];
       await request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: pendingMessages }) }).catch(() => {});
       const data = await request(API + "/chat", { method: "POST", body: JSON.stringify({ projectId, message: text, history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })) }) });
@@ -170,7 +171,7 @@ export default function App() {
   return <div className="app-shell">
     <header className="topbar">
       <div className="brand"><div className="brand-mark"><Sparkles size={18}/></div><div><strong>AI Studio</strong><small>Tu espacio de creación</small></div></div>
-      <div className="top-project"><span>PROYECTO</span><select value={projectId} onChange={(e) => setProjectId(e.target.value)}>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><button className="icon-button" title="Nuevo proyecto" onClick={createProject}><Plus size={16}/></button></div>
+      <div className="top-project"><span>PROYECTO</span><select value={projectId} onChange={(e) => { if (!saved && !window.confirm("Tenés cambios sin guardar. ¿Cambiar de proyecto y descartarlos?")) return; setProjectId(e.target.value); }}>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><button className="icon-button" title="Nuevo proyecto" onClick={createProject}><Plus size={16}/></button></div>
       <div className="top-actions"><div className="connection"><i className={health?.apiKeyConfigured ? "online" : ""}/>{health?.apiKeyConfigured ? "IA configurada" : "Falta configurar IA"}</div><button className="icon-button" title="Configuración" onClick={() => setShowSettings(true)}><Settings2 size={17}/></button><a className="icon-button" title="Repositorio GitHub" href="https://github.com/PabloParis1981/AI-Studio" target="_blank" rel="noreferrer"><Github size={17}/></a></div>
     </header>
     {error && <div className="error-banner">{error}<button onClick={() => setError("")}><X size={14}/></button></div>}
