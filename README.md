@@ -51,3 +51,11 @@ El servidor de la aplicación usa el puerto 8787. Los servidores de vista previa
 ## Integración GitHub
 
 El código fuente de AI Studio está versionado en este repositorio. La sincronización de los proyectos creados desde la interfaz con repositorios GitHub todavía requiere configuración y desarrollo adicional.
+
+
+### Gestión de proyectos
+
+- Renombrar un proyecto sin cambiar su identificador interno.
+- Duplicar proyectos para crear una copia independiente de sus archivos.
+- Las copias excluyen dependencias instaladas, compilaciones y el historial interno de conversación.
+- Los archivos de configuración seguros `.gitignore` y `.env.example` se conservan en el explorador y en las exportaciones.
