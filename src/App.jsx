@@ -39,6 +39,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const chatEnd = useRef(null);
+  const lastLoadedProject = useRef("");
   const project = projects.find((p) => p.id === projectId);
   const previewDoc = useMemo(() => {
     if (activeFile.endsWith(".html")) return code;
@@ -58,7 +59,11 @@ export default function App() {
     if (!id) return;
     const data = await request(API + "/projects/" + id + "/files");
     setTree(data.tree);
-    if (!activeFile || !data.files.includes(activeFile)) await openFile(data.files.includes("index.html") ? "index.html" : data.files[0], id);
+    const projectChanged = lastLoadedProject.current !== id;
+    if (projectChanged) lastLoadedProject.current = id;
+    if (projectChanged || !activeFile || !data.files.includes(activeFile)) {
+      await openFile(data.files.includes("index.html") ? "index.html" : data.files[0], id);
+    }
   }
   async function openFile(file, id = projectId) {
     if (!file) return;
