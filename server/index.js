@@ -78,6 +78,38 @@ async function startProject(id) {
 
 app.use(express.json({ limit: "12mb" }));
 
+// This IDE executes project commands and stores provider keys, so its API is loopback-only.
+function isLoopbackAddress(address) {
+  const value = String(address || "").toLowerCase().replace(/^::ffff:/, "");
+  return value === "::1" || value === "127.0.0.1" || /^127\\./.test(value);
+}
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+app.use((req, res, next) => {
+  const remoteAddress = req.socket?.remoteAddress;
+  const hostHeader = String(req.headers.host || "");
+  let parsedHost;
+  try { parsedHost = new URL("http://" + hostHeader); } catch {}
+  const hostname = parsedHost?.hostname?.toLowerCase();
+  if (!isLoopbackAddress(remoteAddress) || !LOCAL_HOSTS.has(hostname)) {
+    return res.status(403).json({ error: "Este servidor solo acepta conexiones locales." });
+  }
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    const fetchSite = String(req.headers["sec-fetch-site"] || "").toLowerCase();
+    if (fetchSite === "cross-site") return res.status(403).json({ error: "Solicitud entre sitios bloqueada." });
+    const origin = req.headers.origin;
+    if (origin) {
+      let parsedOrigin;
+      try { parsedOrigin = new URL(origin); } catch {}
+      if (!parsedOrigin || !["http:", "https:"].includes(parsedOrigin.protocol) ||
+          !LOCAL_HOSTS.has(parsedOrigin.hostname.toLowerCase()) ||
+          parsedOrigin.host.toLowerCase() !== hostHeader.toLowerCase()) {
+        return res.status(403).json({ error: "Origen no permitido." });
+      }
+    }
+  }
+  next();
+});
+
 const safeId = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 48) || "project";
 const projectDir = (id) => {
   const target = path.resolve(DATA, safeId(id));
