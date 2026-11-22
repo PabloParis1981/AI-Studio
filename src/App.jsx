@@ -26,7 +26,7 @@ export default function App() {
   const [activeFile, setActiveFile] = useState("");
   const [code, setCode] = useState("");
   const [saved, setSaved] = useState(true);
-  const [messages, setMessages] = useState([{ role: "assistant", content: "¡Hola! Soy tu asistente de programación. Contame qué querés construir y puedo crear o modificar archivos directamente en tu proyecto." }]);
+  const [messages, setMessages] = useState([{ role: "assistant", content: "¡Hola! Soy ChatGPT, tu asistente de desarrollo. Contame qué querés construir y puedo crear o modificar archivos directamente en tu proyecto." }]);
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState("preview");
@@ -135,13 +135,13 @@ export default function App() {
         </div>
       </section>
       <aside className="chat-panel">
-        <div className="chat-heading"><div className="chat-heading-icon"><Bot size={17}/></div><div><strong>Asistente IA</strong><small>Construye y modifica tu proyecto</small></div><span className="model-pill">IA</span></div>
-        <div className="chat-context"><WandSparkles size={14}/><span>Puede crear y editar archivos por vos</span></div>
+        <div className="chat-heading"><div className="chat-heading-icon"><Bot size={17}/></div><div><strong>ChatGPT</strong><small>Motor de desarrollo de OpenAI</small></div><span className="model-pill">OPENAI</span></div>
+        <div className="chat-context"><WandSparkles size={14}/><span>ChatGPT construye, edita y ejecuta tu aplicación</span></div>
         <div className="messages">
-          {messages.map((m, i) => <div key={i} className={"message " + m.role}><div className="message-avatar">{m.role === "assistant" ? <Sparkles size={14}/> : "T"}</div><div className="message-content"><div className="message-role">{m.role === "assistant" ? "AI STUDIO" : "VOS"}</div><p>{m.content}</p></div></div>)}
+          {messages.map((m, i) => <div key={i} className={"message " + m.role}><div className="message-avatar">{m.role === "assistant" ? <Sparkles size={14}/> : "T"}</div><div className="message-content"><div className="message-role">{m.role === "assistant" ? "CHATGPT" : "VOS"}</div><p>{m.content}</p></div></div>)}
           {busy && <div className="thinking"><span/><span/><span/> La IA está trabajando en los archivos...</div>}<div ref={chatEnd}/>
         </div>
-        <div className="chat-composer"><div className="composer-hint">Describí el cambio o la aplicación que querés crear</div><textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }} placeholder="Ej.: Creá una landing page moderna..." rows={3}/><div className="composer-footer"><span><Sparkles size={13}/> La IA puede escribir código</span><button className="send-button" disabled={!prompt.trim() || busy} onClick={sendMessage}><Send size={15}/> Enviar</button></div></div>
+        <div className="chat-composer"><div className="composer-hint">Describí el cambio o la aplicación que querés crear</div><textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }} placeholder="Ej.: Creá una landing page moderna..." rows={3}/><div className="composer-footer"><span><Sparkles size={13}/> ChatGPT puede escribir y ejecutar código</span><button className="send-button" disabled={!prompt.trim() || busy} onClick={sendMessage}><Send size={15}/> Enviar</button></div></div>
       </aside>
     </main>
     {showSettings && <div className="modal-backdrop" onClick={() => setShowSettings(false)}><div className="settings-modal" onClick={(e) => e.stopPropagation()}><div className="modal-title"><strong>Configuración</strong><button className="icon-button" onClick={() => setShowSettings(false)}><X size={17}/></button></div><div className="setting-row"><Sparkles size={18}/><div><strong>Motor de IA</strong><p>La API key se configura en el servidor mediante la variable OPENAI_API_KEY. Nunca se guarda en el navegador ni en GitHub.</p></div></div><div className="setting-row"><Github size={18}/><div><strong>Repositorio</strong><p>Este proyecto vive en PabloParis1981/AI-Studio. La sincronización GitHub está en desarrollo.</p><a href="https://github.com/PabloParis1981/AI-Studio" target="_blank" rel="noreferrer">Abrir repositorio ↗</a></div></div></div></div>}
