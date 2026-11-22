@@ -86,4 +86,4 @@ El servidor aplica límites aunque se invoque la API directamente: 2 MB para arc
 
 ### Procesos y datos internos
 
-El servidor protege también los archivos internos de configuración e historial del proyecto frente a enlaces simbólicos. Al detener una vista previa o al vencer el tiempo de una tarea, intenta cerrar el árbol completo de procesos para evitar servidores o comandos hijos huérfanos.
+El servidor protege también los archivos internos de configuración e historial del proyecto frente a enlaces simbólicos. Al detener una vista previa, al vencer el tiempo de una tarea o al cerrar AI Studio, intenta cerrar el árbol completo de procesos para evitar servidores hijos huérfanos.
