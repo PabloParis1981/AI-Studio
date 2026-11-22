@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
 function Invoke-Gcloud {
-  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
+  param([Parameter(ValueFromRemainingArguments = $true)][string[]]$GcloudArgs)
   & gcloud @Args
   if ($LASTEXITCODE -ne 0) { throw "Falló gcloud $($Args -join ' ')" }
 }
