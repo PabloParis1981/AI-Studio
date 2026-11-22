@@ -89,6 +89,12 @@ try {
     await fs.symlink(outside, path.join(DATA, id, "linked-folder"), "dir");
     await call(`/api/projects/${id}/file?path=linked-folder%2Fsecret.txt`, {}, 404);
     await call(`/api/projects/${id}/file`, { method: "PUT", body: JSON.stringify({ path: "linked-folder/new.txt", content: "blocked" }) }, 400);
+    const metadataProject = await call("/api/projects", { method: "POST", body: JSON.stringify({ name: "Metadata Symlink Test" }) });
+    createdIds.push(metadataProject.project.id);
+    await fs.rm(path.join(DATA, metadataProject.project.id, ".studio"), { recursive: true, force: true });
+    await fs.symlink(outside, path.join(DATA, metadataProject.project.id, ".studio"), "dir");
+    await call(`/api/projects/${metadataProject.project.id}/conversation`, {}, 400);
+    await call(`/api/projects/${metadataProject.project.id}`, { method: "PATCH", body: JSON.stringify({ name: "No debe escribir" }) }, 400);
     await fs.symlink(outside, path.join(DATA, "linked-project-test"), "dir");
     await call("/api/projects/linked-project-test/files", {}, 400);
   } finally {
@@ -98,7 +104,7 @@ try {
 
   const listing = await call("/api/projects");
   assert.ok(listing.projects.some((project) => project.id === id && project.name === "Proyecto Renombrado"));
-  console.log("Smoke tests OK: health, projects, bounded text/binary files, conversation, rename, duplicate, secret exclusion, path traversal and symlink protection.");
+  console.log("Smoke tests OK: health, projects, bounded text/binary files, conversation, rename, duplicate, secret exclusion, path traversal, project symlink and internal metadata symlink protection.");
 } finally {
   child.kill();
   await Promise.all(createdIds.map((id) => fs.rm(path.join(DATA, id), { recursive: true, force: true }).catch(() => {})));
