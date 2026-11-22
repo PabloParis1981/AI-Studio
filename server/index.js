@@ -156,36 +156,17 @@ app.post("/api/settings/provider-key", async (req, res) => {
   const envName = provider === "gemini" ? "GEMINI_API_KEY" : provider === "openai" ? "OPENAI_API_KEY" : "";
   if (!envName) return res.status(400).json({ error: "Proveedor no admitido para esta configuración." });
   const key = String(apiKey || "").trim();
-  if (key.length < 20 || key.length > 500 || /[\r\n\0]/.test(key)) return res.status(400).json({ error: "La clave no parece válida. Revisá que hayas copiado la clave completa." });
+  if (key.length < 20 || key.length > 500 || /[\\r\\n\\0]/.test(key)) return res.status(400).json({ error: "La clave no parece válida. Revisá que hayas copiado la clave completa." });
   try {
     let existing = "";
     try { existing = await fs.readFile(ENV_FILE, "utf8"); } catch (error) { if (error.code !== "ENOENT") throw error; }
-    const escapedName = envName.replace(/[.*+?^{}()|[\]\\]/g, "\\app.post("/api/settings/provider-key", async (req, res) => {
-  const { provider, apiKey } = req.body || {};
-  if (provider !== "gemini") return res.status(400).json({ error: "Proveedor no admitido para esta configuración." });
-  const key = String(apiKey || "").trim();
-  if (key.length < 20 || key.length > 500 || /[\r\n\0]/.test(key)) return res.status(400).json({ error: "La clave no parece válida. Revisá que hayas copiado la clave completa." });
-  try {
-    let existing = "";
-    try { existing = await fs.readFile(ENV_FILE, "utf8"); } catch (error) { if (error.code !== "ENOENT") throw error; }
-    const lines = existing.split(/\r?\n/).filter((line) => !/^\s*(?:export\s+)?GEMINI_API_KEY\s*=/.test(line));
-    while (lines.length && lines[lines.length - 1] === "") lines.pop();
-    lines.push("GEMINI_API_KEY=" + JSON.stringify(key));
-    const contents = lines.join("\n") + "\n";
-    const tempFile = ENV_FILE + ".tmp-" + process.pid;
-    await fs.writeFile(tempFile, contents, { encoding: "utf8", mode: 0o600 });
-    await fs.rename(tempFile, ENV_FILE);
-    try { await fs.chmod(ENV_FILE, 0o600); } catch {}
-    process.env.GEMINI_API_KEY = key;
-    res.json({ ok: true, configured: true });
-  } catch (error) {
-    res.status(500).json({ error: "No pude guardar la clave localmente: " + error.message });
-  }
-});");
-    const lines = existing.split(/\r?\n/).filter((line) => !new RegExp("^\\s*(?:export\\s+)?" + escapedName + "\\s*=").test(line));
+    const lines = existing.split(/\\r?\\n/).filter((line) => {
+      const name = line.trim().replace(/^export\\s+/, "").split("=")[0].trim();
+      return name !== envName;
+    });
     while (lines.length && lines[lines.length - 1] === "") lines.pop();
     lines.push(envName + "=" + JSON.stringify(key));
-    const contents = lines.join("\n") + "\n";
+    const contents = lines.join("\\n") + "\\n";
     const tempFile = ENV_FILE + ".tmp-" + process.pid;
     await fs.writeFile(tempFile, contents, { encoding: "utf8", mode: 0o600 });
     await fs.rename(tempFile, ENV_FILE);
