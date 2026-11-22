@@ -571,10 +571,31 @@ app.post("/api/chat", async (req, res) => {
 });
 
 const dist = path.join(ROOT, "dist");
-app.use(express.static(dist));
+const indexFile = path.join(dist, "index.html");
+
+// Serve the application entry point explicitly. Some hosted preview routers
+// forward the root request differently from static-file middleware.
+app.get("/", async (_req, res, next) => {
+  try {
+    await fs.access(indexFile);
+    res.setHeader("Cache-Control", "no-store");
+    return res.sendFile(indexFile);
+  } catch {
+    return next();
+  }
+});
+app.use(express.static(dist, { index: false }));
 app.get("/{*splat}", async (_req, res, next) => {
-  try { await fs.access(path.join(dist, "index.html")); res.sendFile(path.join(dist, "index.html")); }
-  catch { next(); }
+  try {
+    await fs.access(indexFile);
+    res.setHeader("Cache-Control", "no-store");
+    return res.sendFile(indexFile);
+  } catch {
+    return next();
+  }
+});
+app.use((req, res) => {
+  res.status(404).type("text").send("Ruta no encontrada en AI Studio. Volvé a abrir la dirección principal de la aplicación.");
 });
 const port = Number(process.env.PORT || 3000);
 const host = process.env.HOST || (IS_PRODUCTION ? "0.0.0.0" : "127.0.0.1");
