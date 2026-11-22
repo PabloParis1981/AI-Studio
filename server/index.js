@@ -117,6 +117,23 @@ app.post("/api/projects", async (req, res) => {
 app.post("/api/projects/:id/run", async (req, res) => { try { res.json(await startProject(req.params.id)); } catch (e) { res.status(400).json({ error: e.message }); } });
 app.get("/api/projects/:id/run", (req, res) => { const state = runningProjects.get(req.params.id); res.json(state ? { running: state.process.exitCode === null, port: state.port, url: `http://localhost:${state.port}`, logs: state.logs.join("").slice(-8000) } : { running: false, logs: "" }); });
 app.post("/api/projects/:id/stop", (req, res) => { const state = runningProjects.get(req.params.id); if (state) { state.process.kill(); runningProjects.delete(req.params.id); } res.json({ ok: true }); });
+app.post("/api/projects/:id/terminal", async (req, res) => {
+  const command = String(req.body?.command || "").trim();
+  if (!command || command.length > 2000) return res.status(400).json({ error: "Escribí un comando válido (máximo 2000 caracteres)." });
+  try {
+    const cwd = await ensureProject(req.params.id);
+    const shell = process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : process.env.SHELL || "/bin/bash";
+    const args = process.platform === "win32" ? ["/d", "/s", "/c", command] : ["-lc", command];
+    const child = spawn(shell, args, { cwd, windowsHide: true, env: { ...process.env, BROWSER: "none", FORCE_COLOR: "0" } });
+    let output = "";
+    let timedOut = false;
+    const append = (chunk) => { output += String(chunk); if (output.length > 24000) output = output.slice(-24000); };
+    child.stdout.on("data", append); child.stderr.on("data", append);
+    const timer = setTimeout(() => { timedOut = true; child.kill(); }, 60000);
+    child.on("error", (error) => { clearTimeout(timer); if (!res.headersSent) res.status(500).json({ error: error.message }); });
+    child.on("close", (code) => { clearTimeout(timer); if (!res.headersSent) res.json({ command, output, exitCode: code, timedOut }); });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
 app.get("/api/projects/:id/files", async (req, res) => {
   try {
     const dir = await ensureProject(req.params.id);
