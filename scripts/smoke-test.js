@@ -54,11 +54,18 @@ try {
   await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "unknown" }) }, 400);
   const geminiMissing = await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "gemini" }) }, 503);
   assert.match(geminiMissing.error, /GEMINI_API_KEY/);
+  await fs.writeFile(settingsFile, "KEEP_SETTING=preserve-me\nGEMINI_API_KEY=old-gemini-key-value-1234567890\n");
   const savedKey = "AIzaSyExampleTestKey1234567890";
   const keyResult = await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "gemini", apiKey: savedKey }) });
   assert.equal(keyResult.ok, true);
-  assert.equal((await fs.readFile(settingsFile, "utf8")).includes(savedKey), true);
-  assert.equal((await call("/api/health")).providers.gemini.configured, true);
+  const firstSavedEnv = await fs.readFile(settingsFile, "utf8");
+  assert.equal(firstSavedEnv.includes(savedKey), true);
+  assert.equal(firstSavedEnv.includes("KEEP_SETTING=preserve-me"), true);
+  assert.equal((firstSavedEnv.match(/^GEMINI_API_KEY=/gm) || []).length, 1);
+  const geminiHealth = await call("/api/health");
+  assert.equal(geminiHealth.providers.gemini.configured, true);
+  assert.equal(JSON.stringify(geminiHealth).includes(savedKey), false);
+  if (process.platform !== "win32") assert.equal((await fs.stat(settingsFile)).mode & 0o777, 0o600);
   const openaiKey = "sk-test-example-key-12345678901234567890";
   const openaiKeyResult = await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "openai", apiKey: openaiKey }) });
   assert.equal(openaiKeyResult.provider, "openai");
@@ -68,7 +75,12 @@ try {
   const configuredHealth = await call("/api/health");
   assert.equal(configuredHealth.providers.openai.configured, true);
   assert.equal(configuredHealth.providers.gemini.configured, true);
+  assert.equal(JSON.stringify(configuredHealth).includes(openaiKey), false);
+  assert.equal((savedEnv.match(/^OPENAI_API_KEY=/gm) || []).length, 1);
+  assert.equal(savedEnv.includes("KEEP_SETTING=preserve-me"), true);
+  await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "unknown", apiKey: openaiKey }) }, 400);
   await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "gemini", apiKey: "short" }) }, 400);
+  await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "openai", apiKey: "valid-looking-key-12345678901234567890\\nMALICIOUS=value" }) }, 400);
 
   const created = await call("/api/projects", { method: "POST", body: JSON.stringify({ name: "Smoke Test" }) });
   const id = created.project.id;
