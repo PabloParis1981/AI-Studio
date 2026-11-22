@@ -110,9 +110,11 @@ export default function App() {
     try {
       const listing = await request(API + "/projects/" + projectId + "/files");
       const zip = new JSZip();
+      const binaryExt = /\\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|mp3|mp4|pdf|zip|webm)$/i;
       for (const file of listing.files) {
-        const data = await request(API + "/projects/" + projectId + "/file?path=" + encodeURIComponent(file));
-        zip.file(file, data.content);
+        const binary = binaryExt.test(file);
+        const data = await request(API + "/projects/" + projectId + "/file?path=" + encodeURIComponent(file) + (binary ? "&encoding=base64" : ""));
+        zip.file(file, binary ? data.contentBase64 : data.content, binary ? { base64: true } : undefined);
       }
       const blob = await zip.generateAsync({ type: "blob" });
       const url = URL.createObjectURL(blob); const link = document.createElement("a");
@@ -144,7 +146,7 @@ export default function App() {
         let relative = stripRoot ? entry.name.slice(roots[0].length + 1) : entry.name;
         relative = relative.replace(/\\/g, "/");
         const parts = relative.split("/");
-        if (!relative || relative.startsWith("/") || parts.some((part) => !part || part === "." || part === ".." || part.startsWith(".")) || parts.some((part) => ["node_modules", "dist", ".git"].includes(part))) continue;
+        if (!relative || relative.startsWith("/") || parts.some((part) => !part || part === "." || part === ".." || (part.startsWith(".") && ![".gitignore", ".env.example"].includes(part))) || parts.some((part) => ["node_modules", "dist", ".git"].includes(part))) continue;
         const size = Number(entry._data?.uncompressedSize || 0);
         totalSize += size;
         if (files.length >= 300 || totalSize > 50 * 1024 * 1024) throw new Error("El ZIP contiene demasiados archivos o supera 50 MB descomprimidos.");
