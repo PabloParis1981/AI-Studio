@@ -81,7 +81,12 @@ try {
     await fs.symlink(outside, path.join(DATA, id, "linked-folder"), "dir");
     await call(`/api/projects/${id}/file?path=linked-folder%2Fsecret.txt`, {}, 404);
     await call(`/api/projects/${id}/file`, { method: "PUT", body: JSON.stringify({ path: "linked-folder/new.txt", content: "blocked" }) }, 400);
-  } finally { await fs.rm(outside, { recursive: true, force: true }); }
+    await fs.symlink(outside, path.join(DATA, "linked-project-test"), "dir");
+    await call("/api/projects/linked-project-test/files", {}, 400);
+  } finally {
+    await fs.rm(path.join(DATA, "linked-project-test"), { recursive: true, force: true });
+    await fs.rm(outside, { recursive: true, force: true });
+  }
 
   const listing = await call("/api/projects");
   assert.ok(listing.projects.some((project) => project.id === id && project.name === "Proyecto Renombrado"));
