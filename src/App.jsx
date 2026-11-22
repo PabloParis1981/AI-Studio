@@ -21,6 +21,8 @@ function FileTree({ nodes, active, onOpen, level = 0 }) {
 }
 export default function App() {
   const [health, setHealth] = useState(null);
+  const [provider, setProvider] = useState("openai");
+  const [modelChoice, setModelChoice] = useState("");
   const [projects, setProjects] = useState([]);
   const [projectId, setProjectId] = useState("");
   const [tree, setTree] = useState([]);
@@ -82,7 +84,7 @@ export default function App() {
     if (!projectId) return;
     let active = true;
     request(API + "/projects/" + projectId + "/conversation").then((data) => {
-      if (active) setMessages(data.messages?.length ? data.messages : [{ role: "assistant", content: "¡Hola! Soy ChatGPT, tu asistente de desarrollo. Contame qué querés construir y puedo crear o modificar archivos directamente en tu proyecto." }]);
+      if (active) { setMessages(data.messages?.length ? data.messages : [{ role: "assistant", content: "¡Hola! Elegí ChatGPT u Gemini y contame qué querés construir. Puedo crear y modificar archivos directamente en tu proyecto." }]); setProvider(data.provider || "openai"); setModelChoice(data.model || ""); }
     }).catch((e) => { if (active) setError(e.message); });
     setTerminalHistory([]); setRunInfo({ running: false, url: "", logs: "" });
     return () => { active = false; };
@@ -248,11 +250,12 @@ export default function App() {
     try {
       if (!saved) await saveFile();
       const pendingMessages = [...messages, { role: "user", content: text }];
-      await request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: pendingMessages }) }).catch(() => {});
-      const data = await request(API + "/chat", { method: "POST", body: JSON.stringify({ projectId, message: text, history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })) }) });
+      await request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: pendingMessages, provider, model: modelChoice }) }).catch(() => {});
+      const data = await request(API + "/chat", { method: "POST", body: JSON.stringify({ projectId, message: text, provider, model: modelChoice || undefined, history: messages.slice(-10).map((m) => ({ role: m.role, content: m.content })) }) });
+      if (data.model) setModelChoice(data.model);
       const updatedMessages = [...messages, { role: "user", content: text }, { role: "assistant", content: data.answer }];
       setMessages(updatedMessages);
-      await request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: updatedMessages }) }).catch(() => {});
+      await request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: updatedMessages, provider, model: modelChoice }) }).catch(() => {});
       try {
         await loadTree();
         const current = activeFile || "index.html";
@@ -308,15 +311,26 @@ export default function App() {
         </div>
       </section>
       <aside className="chat-panel">
-        <div className="chat-heading"><div className="chat-heading-icon"><Bot size={17}/></div><div><strong>ChatGPT</strong><small>Motor de desarrollo de OpenAI</small></div><span className="model-pill">{health?.model || "OPENAI"}</span></div>
-        <div className="chat-context"><WandSparkles size={14}/><span>ChatGPT construye, edita y ejecuta tu aplicación</span></div>
+        <div className="chat-heading"><div className="chat-heading-icon"><Bot size={17}/></div><div><strong>{provider === "gemini" ? "Gemini" : "ChatGPT"}</strong><small>Motor de desarrollo · {provider === "gemini" ? "Google" : "OpenAI"}</small></div><span className="model-pill">{modelChoice || health?.providers?.[provider]?.model || (provider === "gemini" ? "GEMINI" : "OPENAI")}</span></div>
+        <div className="provider-toolbar">
+          <label>Motor</label>
+          <select value={provider} disabled={busy} onChange={(e) => { const next = e.target.value; setProvider(next); setModelChoice(health?.providers?.[next]?.model || ""); }}>
+            <option value="openai">ChatGPT · OpenAI</option><option value="gemini">Gemini · Google</option>
+          </select>
+          <label>Modelo</label>
+          <select value={modelChoice || health?.providers?.[provider]?.model || ""} disabled={busy} onChange={(e) => setModelChoice(e.target.value)}>
+            {(provider === "gemini" ? ["gemini-3.8-flash","gemini-4-argon","gemini-4-hydrogen","gemini-4-neon","gemini-4-carbon"] : [health?.providers?.openai?.model || "gpt-6.2-astra"]).map((model) => <option key={model} value={model}>{model}</option>)}
+          </select>
+          <span className={health?.providers?.[provider]?.configured ? "provider-ready" : "provider-missing"}>{health?.providers?.[provider]?.configured ? "Conectado" : "Falta API key"}</span>
+        </div>
+        <div className="chat-context"><WandSparkles size={14}/><span>{provider === "gemini" ? "Gemini" : "ChatGPT"} construye, edita y ejecuta tu aplicación con las mismas herramientas del proyecto</span></div>
         <div className="messages">
-          {messages.map((m, i) => <div key={i} className={"message " + m.role}><div className="message-avatar">{m.role === "assistant" ? <Sparkles size={14}/> : "T"}</div><div className="message-content"><div className="message-role">{m.role === "assistant" ? "CHATGPT" : "VOS"}</div><p>{m.content}</p></div></div>)}
+          {messages.map((m, i) => <div key={i} className={"message " + m.role}><div className="message-avatar">{m.role === "assistant" ? <Sparkles size={14}/> : "T"}</div><div className="message-content"><div className="message-role">{m.role === "assistant" ? (provider === "gemini" ? "GEMINI" : "CHATGPT") : "VOS"}</div><p>{m.content}</p></div></div>)}
           {busy && <div className="thinking"><span/><span/><span/> La IA está trabajando en los archivos...</div>}<div ref={chatEnd}/>
         </div>
-        <div className="chat-composer"><div className="composer-hint">Describí el cambio o la aplicación que querés crear</div><textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }} placeholder="Ej.: Creá una landing page moderna..." rows={3}/><div className="composer-footer"><span><Sparkles size={13}/> ChatGPT puede escribir y ejecutar código</span><button className="send-button" disabled={!prompt.trim() || busy} onClick={sendMessage}><Send size={15}/> Enviar</button></div></div>
+        <div className="chat-composer"><div className="composer-hint">Describí el cambio o la aplicación que querés crear</div><textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }} placeholder="Ej.: Creá una landing page moderna..." rows={3}/><div className="composer-footer"><span><Sparkles size={13}/> {provider === "gemini" ? "Gemini" : "ChatGPT"} puede escribir y ejecutar código</span><button className="send-button" disabled={!prompt.trim() || busy} onClick={sendMessage}><Send size={15}/> Enviar</button></div></div>
       </aside>
     </main>
-    {showSettings && <div className="modal-backdrop" onClick={() => setShowSettings(false)}><div className="settings-modal" onClick={(e) => e.stopPropagation()}><div className="modal-title"><strong>Configuración</strong><button className="icon-button" onClick={() => setShowSettings(false)}><X size={17}/></button></div><div className="setting-row"><Sparkles size={18}/><div><strong>Motor de IA</strong><p>La clave se configura solo en el servidor, dentro del archivo local <code>.env</code>, con la variable <code>OPENAI_API_KEY</code>. Copiá <code>.env.example</code> como <code>.env</code>, agregá tu clave y reiniciá AI Studio. Nunca la guardes en el proyecto ni la subas a GitHub.</p><p>Importante: el uso de OpenAI API se factura por separado; la suscripción de ChatGPT no incluye crédito de API.</p></div></div><div className="setting-row"><Github size={18}/><div><strong>Repositorio</strong><p>Este proyecto vive en PabloParis1981/AI-Studio. La sincronización GitHub está en desarrollo.</p><a href="https://github.com/PabloParis1981/AI-Studio" target="_blank" rel="noreferrer">Abrir repositorio ↗</a></div></div></div></div>}
+    {showSettings && <div className="modal-backdrop" onClick={() => setShowSettings(false)}><div className="settings-modal" onClick={(e) => e.stopPropagation()}><div className="modal-title"><strong>Configuración</strong><button className="icon-button" onClick={() => setShowSettings(false)}><X size={17}/></button></div><div className="setting-row"><Sparkles size={18}/><div><strong>Motores de IA</strong><p>Configurá las claves en el archivo local <code>.env</code> del servidor: <code>OPENAI_API_KEY</code> para ChatGPT y <code>GEMINI_API_KEY</code> para Gemini. Copiá <code>.env.example</code> como <code>.env</code>, agregá las claves que quieras usar y reiniciá AI Studio. Nunca las guardes en el proyecto ni las subas a GitHub.</p><p>La facturación de OpenAI API y Gemini API es independiente de las suscripciones de ChatGPT y Google.</p><p>Estado: OpenAI {health?.providers?.openai?.configured ? "conectado" : "sin configurar"} · Gemini {health?.providers?.gemini?.configured ? "conectado" : "sin configurar"}.</p></div></div><div className="setting-row"><Github size={18}/><div><strong>Repositorio</strong><p>Este proyecto vive en PabloParis1981/AI-Studio. La sincronización GitHub está en desarrollo.</p><a href="https://github.com/PabloParis1981/AI-Studio" target="_blank" rel="noreferrer">Abrir repositorio ↗</a></div></div></div></div>}
   </div>;
 }
