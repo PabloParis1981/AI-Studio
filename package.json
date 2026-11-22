@@ -17,7 +17,8 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "dotenv": "^16.4.7",
-    "jszip": "^3.10.1"
+    "jszip": "^3.10.1",
+    "@google/genai": "^2.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
