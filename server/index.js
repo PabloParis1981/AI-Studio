@@ -181,6 +181,10 @@ app.get("/api/projects/:id/files", async (req, res) => {
 app.get("/api/projects/:id/file", async (req, res) => {
   try {
     const target = filePath(req.params.id, req.query.path);
+    if (req.query.encoding === "base64") {
+      const contentBase64 = (await fs.readFile(target)).toString("base64");
+      return res.json({ path: req.query.path, contentBase64 });
+    }
     const content = await fs.readFile(target, "utf8");
     res.json({ path: req.query.path, content });
   } catch (e) { res.status(404).json({ error: e.message }); }
