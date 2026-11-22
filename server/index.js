@@ -126,8 +126,7 @@ async function walk(dir, base = dir) {
   return out;
 }
 async function allFiles(id) {
-  const dir = projectDir(id);
-  await fs.mkdir(dir, { recursive: true });
+  const dir = await ensureProject(id);
   const tree = await walk(dir);
   const flat = [];
   const visit = (nodes) => nodes.forEach((n) => n.type === "file" ? flat.push(n.path) : visit(n.children || []));
@@ -171,7 +170,8 @@ app.patch("/api/projects/:id", async (req, res) => {
 app.post("/api/projects/:id/duplicate", async (req, res) => {
   try {
     const source = projectDir(req.params.id);
-    await fs.access(source);
+    const sourceStat = await fs.lstat(source);
+    if (sourceStat.isSymbolicLink() || !sourceStat.isDirectory()) throw new Error("La carpeta del proyecto no es segura.");
     const sourceName = await readProjectName(req.params.id);
     const name = String(req.body?.name || (sourceName + " (copia)")).trim().slice(0, 80);
     const id = safeId(name) + "-" + Date.now().toString(36).slice(-5);
