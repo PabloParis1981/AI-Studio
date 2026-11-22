@@ -446,7 +446,7 @@ async function runGemini({ apiKey, model, projectId, message, history }) {
       let result;
       try { result = await runTool(projectId, call.name, call.arguments || {}); }
       catch (e) { result = JSON.stringify({ error: e.message }); }
-      results.push({ type: "function_result", name: call.name, call_id: call.id, result: [{ type: "text", text: String(result).slice(0, 30000) }] });
+      results.push({ type: "function_result", name: call.name, call_id: call.id, result: String(result).slice(0, 30000) });
     }
     interaction = await ai.interactions.create({ model, previous_interaction_id: interaction.id, input: results, tools });
   }
