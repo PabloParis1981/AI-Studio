@@ -59,7 +59,15 @@ try {
   assert.equal(keyResult.ok, true);
   assert.equal((await fs.readFile(settingsFile, "utf8")).includes(savedKey), true);
   assert.equal((await call("/api/health")).providers.gemini.configured, true);
-  await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "openai", apiKey: savedKey }) }, 400);
+  const openaiKey = "sk-test-example-key-12345678901234567890";
+  const openaiKeyResult = await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "openai", apiKey: openaiKey }) });
+  assert.equal(openaiKeyResult.provider, "openai");
+  const savedEnv = await fs.readFile(settingsFile, "utf8");
+  assert.equal(savedEnv.includes(savedKey), true);
+  assert.equal(savedEnv.includes(openaiKey), true);
+  const configuredHealth = await call("/api/health");
+  assert.equal(configuredHealth.providers.openai.configured, true);
+  assert.equal(configuredHealth.providers.gemini.configured, true);
   await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "gemini", apiKey: "short" }) }, 400);
 
   const created = await call("/api/projects", { method: "POST", body: JSON.stringify({ name: "Smoke Test" }) });
@@ -125,7 +133,7 @@ try {
 
   const listing = await call("/api/projects");
   assert.ok(listing.projects.some((project) => project.id === id && project.name === "Proyecto Renombrado"));
-  console.log("Smoke tests OK: health, OpenAI/Gemini missing-key handling and provider persistence, projects, bounded text/binary files, conversation, rename, duplicate, secret exclusion, path traversal, project symlink and internal metadata symlink protection.");
+  console.log("Smoke tests OK: health, OpenAI/Gemini missing-key handling and secure provider-key configuration, provider persistence, projects, bounded text/binary files, conversation, rename, duplicate, secret exclusion, path traversal, project symlink and internal metadata symlink protection.");
 } finally {
   child.kill();
   await Promise.all(createdIds.map((id) => fs.rm(path.join(DATA, id), { recursive: true, force: true }).catch(() => {})));
