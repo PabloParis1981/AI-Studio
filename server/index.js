@@ -2,12 +2,43 @@ import "dotenv/config";
 import express from "express";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { spawn } from "node:child_process";
+import net from "node:net";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const DATA = path.join(ROOT, "data", "projects");
 const app = express();
+const runningProjects = new Map();
+const projectPorts = new Map();
+let nextPort = 5180;
+async function freePort() {
+  while (nextPort < 6200) {
+    const port = nextPort++;
+    const available = await new Promise((resolve) => { const server = net.createServer(); server.once("error", () => resolve(false)); server.listen(port, "127.0.0.1", () => server.close(() => resolve(true))); });
+    if (available) return port;
+  }
+  throw new Error("No hay puertos disponibles para la vista previa");
+}
+async function startProject(id) {
+  const dir = await ensureProject(id);
+  const pkgPath = path.join(dir, "package.json");
+  try { await fs.access(pkgPath); } catch { throw new Error("Este proyecto no tiene package.json. Pedile al asistente que lo prepare como aplicación web."); }
+  const existing = runningProjects.get(id);
+  if (existing && existing.process.exitCode === null) return { port: existing.port, url: `http://localhost:${existing.port}`, running: true };
+  const port = projectPorts.get(id) || await freePort();
+  projectPorts.set(id, port);
+  const child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev", "--", "--host", "0.0.0.0", "--port", String(port), "--strictPort"], { cwd: dir, shell: process.platform === "win32", windowsHide: true, env: { ...process.env, BROWSER: "none" } });
+  const state = { process: child, port, logs: [], startedAt: Date.now() };
+  runningProjects.set(id, state);
+  const collect = (chunk) => { state.logs.push(String(chunk)); if (state.logs.length > 100) state.logs.shift(); };
+  child.stdout.on("data", collect); child.stderr.on("data", collect);
+  child.on("exit", () => { if (runningProjects.get(id) === state) runningProjects.delete(id); });
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+  return { port, url: `http://localhost:${port}`, running: child.exitCode === null, logs: state.logs.join("").slice(-5000) };
+}
+
 app.use(express.json({ limit: "2mb" }));
 
 const safeId = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 48) || "project";
@@ -32,6 +63,13 @@ async function ensureProject(id, name) {
   catch {
     await fs.writeFile(marker, '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mi aplicación</title></head><body style="font-family:system-ui;padding:40px"><h1>¡Hola!</h1><p>Tu proyecto empieza aquí.</p></body></html>');
     await fs.writeFile(path.join(dir, "README.md"), "# " + (name || "Mi proyecto") + "\n\nCreado con AI Studio.\n");
+    await fs.mkdir(path.join(dir, "src"), { recursive: true });
+    await fs.writeFile(path.join(dir, "package.json"), JSON.stringify({ name: safeId(name), version: "1.0.0", private: true, type: "module", scripts: { dev: "vite", build: "vite build", preview: "vite preview" }, dependencies: { "@vitejs/plugin-react": "^4.3.4", vite: "^6.0.7", react: "^19.0.0", "react-dom": "^19.0.0", "lucide-react": "^0.468.0" }, devDependencies: {} }, null, 2));
+    await fs.writeFile(path.join(dir, "vite.config.js"), `import { defineConfig } from "vite";\nimport react from "@vitejs/plugin-react";\nexport default defineConfig({ plugins: [react()] });\n`);
+    await fs.writeFile(path.join(dir, "src", "main.jsx"), `import React from "react";\nimport { createRoot } from "react-dom/client";\nimport App from "./App.jsx";\nimport "./style.css";\ncreateRoot(document.getElementById("root")).render(<React.StrictMode><App /></React.StrictMode>);\n`);
+    await fs.writeFile(path.join(dir, "src", "App.jsx"), `export default function App(){return <main style={{fontFamily:"system-ui",padding:40}}><h1>${String(name || "Mi aplicación").replace(/[<>&"]/g,"")}</h1><p>Empezá a crear con tu asistente.</p></main>}\n`);
+    await fs.writeFile(path.join(dir, "src", "style.css"), `:root{font-family:system-ui;color:#1f2937;background:#f8fafc}body{margin:0}\n`);
+    await fs.writeFile(marker, `<!doctype html>\n<html lang="es"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>${String(name || "Mi aplicación").replace(/[<>&"]/g,"")}</title></head><body><div id="root"></div><script type="module" src="/src/main.jsx"></script></body></html>`);
   }
   return dir;
 }
@@ -72,6 +110,9 @@ app.post("/api/projects", async (req, res) => {
     res.json({ project: { id, name } });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
+app.post("/api/projects/:id/run", async (req, res) => { try { res.json(await startProject(req.params.id)); } catch (e) { res.status(400).json({ error: e.message }); } });
+app.get("/api/projects/:id/run", (req, res) => { const state = runningProjects.get(req.params.id); res.json(state ? { running: state.process.exitCode === null, port: state.port, url: `http://localhost:${state.port}`, logs: state.logs.join("").slice(-8000) } : { running: false, logs: "" }); });
+app.post("/api/projects/:id/stop", (req, res) => { const state = runningProjects.get(req.params.id); if (state) { state.process.kill(); runningProjects.delete(req.params.id); } res.json({ ok: true }); });
 app.get("/api/projects/:id/files", async (req, res) => {
   try {
     const dir = await ensureProject(req.params.id);
@@ -115,12 +156,14 @@ app.delete("/api/projects/:id/file", async (req, res) => {
 });
 
 const toolDefinitions = [
+  { type: "function", name: "run_project", description: "Install project dependencies if needed and start its Vite development server for a live preview. Use after building or changing a web app.", parameters: { type: "object", properties: {}, required: [], additionalProperties: false }, strict: true },
   { type: "function", name: "list_project_files", description: "List all files in the current project.", parameters: { type: "object", properties: {}, required: [], additionalProperties: false }, strict: true },
   { type: "function", name: "read_project_file", description: "Read a text file from the current project.", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false }, strict: true },
   { type: "function", name: "write_project_file", description: "Create or replace a text file in the current project. Use this to implement requested code changes.", parameters: { type: "object", properties: { path: { type: "string" }, content: { type: "string" } }, required: ["path", "content"], additionalProperties: false }, strict: true }
 ];
 async function runTool(id, name, args) {
   if (name === "list_project_files") return JSON.stringify(await allFiles(id));
+  if (name === "run_project") return JSON.stringify(await startProject(id));
   if (name === "read_project_file") return await fs.readFile(filePath(id, args.path), "utf8");
   if (name === "write_project_file") {
     const target = filePath(id, args.path);
@@ -136,7 +179,7 @@ app.post("/api/chat", async (req, res) => {
   const { projectId, message, history = [] } = req.body || {};
   if (!projectId || !String(message || "").trim()) return res.status(400).json({ error: "Falta el proyecto o el mensaje." });
   try {
-    const instructions = "Sos el asistente de programación integrado en AI Studio. Ayudás a construir aplicaciones web dentro del proyecto activo. Antes de modificar, inspeccioná los archivos relevantes. Usá las herramientas para leer, listar y escribir archivos. Cuando el usuario pide construir o cambiar algo, hacé los cambios directamente, no te limites a dar instrucciones. Conservá el trabajo existente y explicá brevemente qué archivos cambiaste. No afirmes haber ejecutado pruebas si no las ejecutaste. Nunca solicites ni escribas secretos en archivos del proyecto.";
+    const instructions = "Sos el motor de desarrollo de AI Studio, equivalente al asistente de Google AI Studio pero usando OpenAI. Construís aplicaciones web completas dentro del proyecto activo, no simples ejemplos. Prepará proyectos React + Vite, implementá pantallas funcionales, lógica, estilos y persistencia cuando corresponda. Después de cambios importantes, iniciá el proyecto con run_project para habilitar una vista previa real. Antes de modificar, inspeccioná los archivos relevantes. Usá las herramientas para leer, listar y escribir archivos. Cuando el usuario pide construir o cambiar algo, hacé los cambios directamente, no te limites a dar instrucciones. Conservá el trabajo existente y explicá brevemente qué archivos cambiaste. No afirmes haber ejecutado pruebas si no las ejecutaste. Nunca solicites ni escribas secretos en archivos del proyecto.";
     let input = [...history.slice(-10), { role: "user", content: String(message).slice(0, 12000) }];
     let previousResponseId;
     let response;
