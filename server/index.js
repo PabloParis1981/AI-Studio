@@ -135,22 +135,26 @@ app.put("/api/projects/:id/conversation", async (req, res) => {
     res.json({ ok: true, count: messages.length });
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
-app.post("/api/projects/:id/terminal", async (req, res) => {
-  const command = String(req.body?.command || "").trim();
-  if (!command || command.length > 2000) return res.status(400).json({ error: "Escribí un comando válido (máximo 2000 caracteres)." });
-  try {
-    const cwd = await ensureProject(req.params.id);
-    const shell = process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : process.env.SHELL || "/bin/bash";
-    const args = process.platform === "win32" ? ["/d", "/s", "/c", command] : ["-lc", command];
+async function executeTerminal(id, command) {
+  const cwd = await ensureProject(id);
+  const shell = process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : process.env.SHELL || "/bin/bash";
+  const args = process.platform === "win32" ? ["/d", "/s", "/c", command] : ["-lc", command];
+  return await new Promise((resolve, reject) => {
     const child = spawn(shell, args, { cwd, windowsHide: true, env: { ...process.env, BROWSER: "none", FORCE_COLOR: "0" } });
     let output = "";
     let timedOut = false;
     const append = (chunk) => { output += String(chunk); if (output.length > 24000) output = output.slice(-24000); };
     child.stdout.on("data", append); child.stderr.on("data", append);
     const timer = setTimeout(() => { timedOut = true; child.kill(); }, 60000);
-    child.on("error", (error) => { clearTimeout(timer); if (!res.headersSent) res.status(500).json({ error: error.message }); });
-    child.on("close", (code) => { clearTimeout(timer); if (!res.headersSent) res.json({ command, output, exitCode: code, timedOut }); });
-  } catch (e) { res.status(400).json({ error: e.message }); }
+    child.on("error", (error) => { clearTimeout(timer); reject(error); });
+    child.on("close", (code) => { clearTimeout(timer); resolve({ command, output, exitCode: code, timedOut }); });
+  });
+}
+app.post("/api/projects/:id/terminal", async (req, res) => {
+  const command = String(req.body?.command || "").trim();
+  if (!command || command.length > 2000) return res.status(400).json({ error: "Escribí un comando válido (máximo 2000 caracteres)." });
+  try { res.json(await executeTerminal(req.params.id, command)); }
+  catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.get("/api/projects/:id/files", async (req, res) => {
   try {
@@ -195,6 +199,8 @@ app.delete("/api/projects/:id/file", async (req, res) => {
 });
 
 const toolDefinitions = [
+  { type: "function", name: "run_terminal_command", description: "Execute a shell command in the current project directory. Use npm install, npm run build, tests and diagnostics. Commands have a 60 second limit.", parameters: { type: "object", properties: { command: { type: "string" } }, required: ["command"], additionalProperties: false }, strict: true },
+  { type: "function", name: "delete_project_file", description: "Delete a file from the current project when the user requests removal or a generated file is no longer needed.", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false }, strict: true },
   { type: "function", name: "run_project", description: "Install project dependencies if needed and start its Vite development server for a live preview. Use after building or changing a web app.", parameters: { type: "object", properties: {}, required: [], additionalProperties: false }, strict: true },
   { type: "function", name: "list_project_files", description: "List all files in the current project.", parameters: { type: "object", properties: {}, required: [], additionalProperties: false }, strict: true },
   { type: "function", name: "read_project_file", description: "Read a text file from the current project.", parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"], additionalProperties: false }, strict: true },
@@ -202,6 +208,8 @@ const toolDefinitions = [
 ];
 async function runTool(id, name, args) {
   if (name === "list_project_files") return JSON.stringify(await allFiles(id));
+  if (name === "run_terminal_command") return JSON.stringify(await executeTerminal(id, String(args.command || "").slice(0, 2000)));
+  if (name === "delete_project_file") { const target = filePath(id, args.path); await fs.rm(target, { force: true }); return JSON.stringify({ ok: true, deleted: args.path }); }
   if (name === "run_project") return JSON.stringify(await startProject(id));
   if (name === "read_project_file") return await fs.readFile(filePath(id, args.path), "utf8");
   if (name === "write_project_file") {
@@ -218,7 +226,7 @@ app.post("/api/chat", async (req, res) => {
   const { projectId, message, history = [] } = req.body || {};
   if (!projectId || !String(message || "").trim()) return res.status(400).json({ error: "Falta el proyecto o el mensaje." });
   try {
-    const instructions = "Sos el motor de desarrollo de AI Studio, equivalente al asistente de Google AI Studio pero usando OpenAI. Construís aplicaciones web completas dentro del proyecto activo, no simples ejemplos. Prepará proyectos React + Vite, implementá pantallas funcionales, lógica, estilos y persistencia cuando corresponda. Después de cambios importantes, iniciá el proyecto con run_project para habilitar una vista previa real. Antes de modificar, inspeccioná los archivos relevantes. Usá las herramientas para leer, listar y escribir archivos. Cuando el usuario pide construir o cambiar algo, hacé los cambios directamente, no te limites a dar instrucciones. Conservá el trabajo existente y explicá brevemente qué archivos cambiaste. No afirmes haber ejecutado pruebas si no las ejecutaste. Nunca solicites ni escribas secretos en archivos del proyecto.";
+    const instructions = "Sos el motor de desarrollo de AI Studio, equivalente al asistente de Google AI Studio pero usando OpenAI. Construís aplicaciones web completas dentro del proyecto activo, no simples ejemplos. Prepará proyectos React + Vite, implementá pantallas funcionales, lógica, estilos y persistencia cuando corresponda. Después de cambios importantes, usá run_terminal_command para instalar dependencias, ejecutar compilaciones y pruebas; corregí los errores que aparezcan. Cuando la aplicación compile, iniciá el proyecto con run_project para habilitar una vista previa real. Antes de modificar, inspeccioná los archivos relevantes. Usá las herramientas para leer, listar y escribir archivos. Cuando el usuario pide construir o cambiar algo, hacé los cambios directamente, no te limites a dar instrucciones. Conservá el trabajo existente y explicá brevemente qué archivos cambiaste. No afirmes haber ejecutado pruebas si no las ejecutaste. Nunca solicites ni escribas secretos en archivos del proyecto.";
     let input = [...history.slice(-10), { role: "user", content: String(message).slice(0, 12000) }];
     let previousResponseId;
     let response;
