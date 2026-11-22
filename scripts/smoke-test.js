@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import net from "node:net";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -74,9 +75,17 @@ try {
   await call(`/api/projects/${duplicate.project.id}/file?path=.env`, {}, 404);
   await call(`/api/projects/${id}/file?path=..%2F..%2Fpackage.json`, {}, 404);
 
+  const outside = await fs.mkdtemp(path.join(os.tmpdir(), "ai-studio-outside-"));
+  try {
+    await fs.writeFile(path.join(outside, "secret.txt"), "outside project");
+    await fs.symlink(outside, path.join(DATA, id, "linked-folder"), "dir");
+    await call(`/api/projects/${id}/file?path=linked-folder%2Fsecret.txt`, {}, 404);
+    await call(`/api/projects/${id}/file`, { method: "PUT", body: JSON.stringify({ path: "linked-folder/new.txt", content: "blocked" }) }, 400);
+  } finally { await fs.rm(outside, { recursive: true, force: true }); }
+
   const listing = await call("/api/projects");
   assert.ok(listing.projects.some((project) => project.id === id && project.name === "Proyecto Renombrado"));
-  console.log("Smoke tests OK: health, projects, text/binary files, conversation, rename, duplicate, secret exclusion and path traversal.");
+  console.log("Smoke tests OK: health, projects, text/binary files, conversation, rename, duplicate, secret exclusion, path traversal and symlink protection.");
 } finally {
   child.kill();
   await Promise.all(createdIds.map((id) => fs.rm(path.join(DATA, id), { recursive: true, force: true }).catch(() => {})));
