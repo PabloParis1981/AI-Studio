@@ -156,17 +156,17 @@ app.post("/api/settings/provider-key", async (req, res) => {
   const envName = provider === "gemini" ? "GEMINI_API_KEY" : provider === "openai" ? "OPENAI_API_KEY" : "";
   if (!envName) return res.status(400).json({ error: "Proveedor no admitido para esta configuración." });
   const key = String(apiKey || "").trim();
-  if (key.length < 20 || key.length > 500 || /[\\r\\n\\0]/.test(key)) return res.status(400).json({ error: "La clave no parece válida. Revisá que hayas copiado la clave completa." });
+  if (key.length < 20 || key.length > 500 || /[\r\n\0]/.test(key)) return res.status(400).json({ error: "La clave no parece válida. Revisá que hayas copiado la clave completa." });
   try {
     let existing = "";
     try { existing = await fs.readFile(ENV_FILE, "utf8"); } catch (error) { if (error.code !== "ENOENT") throw error; }
-    const lines = existing.split(/\\r?\\n/).filter((line) => {
-      const name = line.trim().replace(/^export\\s+/, "").split("=")[0].trim();
+    const lines = existing.split(/\r?\n/).filter((line) => {
+      const name = line.trim().replace(/^export\s+/, "").split("=")[0].trim();
       return name !== envName;
     });
     while (lines.length && lines[lines.length - 1] === "") lines.pop();
     lines.push(envName + "=" + JSON.stringify(key));
-    const contents = lines.join("\\n") + "\\n";
+    const contents = lines.join("\n") + "\n";
     const tempFile = ENV_FILE + ".tmp-" + process.pid;
     await fs.writeFile(tempFile, contents, { encoding: "utf8", mode: 0o600 });
     await fs.rename(tempFile, ENV_FILE);
