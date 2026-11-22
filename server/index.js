@@ -396,4 +396,18 @@ app.get("/{*splat}", async (_req, res, next) => {
   catch { next(); }
 });
 const port = Number(process.env.PORT || 8787);
-app.listen(port, "127.0.0.1", () => console.log("AI Studio API running on http://localhost:" + port));
+const httpServer = app.listen(port, "127.0.0.1", () => console.log("AI Studio API running on http://localhost:" + port));
+let shuttingDown = false;
+async function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  await Promise.all([...runningProjects.entries()].map(async ([id, state]) => {
+    await terminateProcessTree(state.process);
+    runningProjects.delete(id);
+  }));
+  httpServer.close(() => process.exit(0));
+  const forceExit = setTimeout(() => process.exit(1), 5000);
+  forceExit.unref?.();
+}
+process.once("SIGINT", shutdown);
+process.once("SIGTERM", shutdown);
