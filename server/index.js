@@ -5,12 +5,15 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import net from "node:net";
+import http from "node:http";
+import { timingSafeEqual } from "node:crypto";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
-const DATA = path.join(ROOT, "data", "projects");
+const DATA = path.resolve(process.env.DATA_DIR || path.join(ROOT, "data", "projects"));
+const IS_PRODUCTION = process.env.APP_ENV === "production" || process.env.NODE_ENV === "production";
 const app = express();
 const MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_BINARY_FILE_BYTES = 7 * 1024 * 1024;
@@ -56,7 +59,7 @@ async function startProject(id) {
     });
   }
   const existing = runningProjects.get(id);
-  if (existing && existing.process.exitCode === null) return { port: existing.port, url: `http://localhost:${existing.port}`, running: Boolean(existing.ready), starting: !existing.ready, logs: existing.logs.join("").slice(-5000) };
+  if (existing && existing.process.exitCode === null) return { port: existing.port, url: IS_PRODUCTION ? `/api/projects/${id}/preview/` : `http://localhost:${existing.port}`, running: Boolean(existing.ready), starting: !existing.ready, logs: existing.logs.join("").slice(-5000) };
   const port = projectPorts.get(id) || await freePort();
   projectPorts.set(id, port);
   const child = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], { cwd: dir, shell: process.platform === "win32", windowsHide: true, detached: process.platform !== "win32", env: { ...safeProjectEnv(), BROWSER: "none" } });
@@ -74,13 +77,13 @@ async function startProject(id) {
     } catch {}
     await new Promise((resolve) => setTimeout(resolve, 350));
   }
-  return { port, url: `http://localhost:${port}`, running: child.exitCode === null && ready, starting: child.exitCode === null && !ready, logs: state.logs.join("").slice(-5000) };
+  return { port, url: IS_PRODUCTION ? `/api/projects/${id}/preview/` : `http://localhost:${port}`, running: child.exitCode === null && ready, starting: child.exitCode === null && !ready, logs: state.logs.join("").slice(-5000) };
 }
 
 // This IDE executes project commands and stores provider keys, so its API is loopback-only.
 function isLoopbackAddress(address) {
   const value = String(address || "").toLowerCase().replace(/^::ffff:/, "");
-  return value === "::1" || value === "127.0.0.1" || /^127\./.test(value);
+  return value === "::1" || value === "127.0.0.1" || /^127\\./.test(value);
 }
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 function safeProjectEnv() {
@@ -90,13 +93,29 @@ function safeProjectEnv() {
   ));
 }
 app.use((req, res, next) => {
-  const remoteAddress = req.socket?.remoteAddress;
-  const hostHeader = String(req.headers.host || "");
-  let parsedHost;
-  try { parsedHost = new URL("http://" + hostHeader); } catch {}
-  const hostname = parsedHost?.hostname?.toLowerCase();
-  if (!isLoopbackAddress(remoteAddress) || !LOCAL_HOSTS.has(hostname)) {
-    return res.status(403).json({ error: "Este servidor solo acepta conexiones locales." });
+  if (IS_PRODUCTION) {
+    const expected = Buffer.from(String(process.env.APP_PASSWORD || ""));
+    if (expected.length < 16) return res.status(503).json({ error: "Falta configurar APP_PASSWORD (mínimo 16 caracteres) en el servicio." });
+    const match = String(req.headers.authorization || "").match(/^Basic\\s+(.+)$/i);
+    let supplied = Buffer.alloc(0);
+    try {
+      const decoded = match ? Buffer.from(match[1], "base64").toString("utf8") : "";
+      supplied = Buffer.from(decoded.slice(decoded.indexOf(":") + 1));
+    } catch {}
+    const valid = supplied.length === expected.length && timingSafeEqual(supplied, expected);
+    if (!valid) {
+      res.setHeader("WWW-Authenticate", 'Basic realm="AI Studio privado", charset="UTF-8"');
+      return res.status(401).json({ error: "Ingresá la contraseña privada de AI Studio." });
+    }
+  } else {
+    const remoteAddress = req.socket?.remoteAddress;
+    const hostHeader = String(req.headers.host || "");
+    let parsedHost;
+    try { parsedHost = new URL("http://" + hostHeader); } catch {}
+    const hostname = parsedHost?.hostname?.toLowerCase();
+    if (!isLoopbackAddress(remoteAddress) || !LOCAL_HOSTS.has(hostname)) {
+      return res.status(403).json({ error: "Este servidor solo acepta conexiones locales." });
+    }
   }
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
     const fetchSite = String(req.headers["sec-fetch-site"] || "").toLowerCase();
@@ -105,11 +124,10 @@ app.use((req, res, next) => {
     if (origin) {
       let parsedOrigin;
       try { parsedOrigin = new URL(origin); } catch {}
-      if (!parsedOrigin || !["http:", "https:"].includes(parsedOrigin.protocol) ||
-          !LOCAL_HOSTS.has(parsedOrigin.hostname.toLowerCase()) ||
-          parsedOrigin.host.toLowerCase() !== hostHeader.toLowerCase()) {
-        return res.status(403).json({ error: "Origen no permitido." });
-      }
+      const hostHeader = String(req.headers.host || "").toLowerCase();
+      const originAllowed = parsedOrigin && ["http:", "https:"].includes(parsedOrigin.protocol) &&
+        (IS_PRODUCTION ? parsedOrigin.host.toLowerCase() === hostHeader : LOCAL_HOSTS.has(parsedOrigin.hostname.toLowerCase()) && parsedOrigin.host.toLowerCase() === hostHeader);
+      if (!originAllowed) return res.status(403).json({ error: "Origen no permitido." });
     }
   }
   next();
@@ -301,7 +319,7 @@ app.post("/api/projects/:id/duplicate", async (req, res) => {
   } catch (e) { res.status(400).json({ error: e.message }); }
 });
 app.post("/api/projects/:id/run", async (req, res) => { try { res.json(await startProject(req.params.id)); } catch (e) { res.status(400).json({ error: e.message }); } });
-app.get("/api/projects/:id/run", (req, res) => { const state = runningProjects.get(req.params.id); const alive = Boolean(state && state.process.exitCode === null); res.json(state ? { running: alive && Boolean(state.ready), starting: alive && !state.ready, port: state.port, url: `http://localhost:${state.port}`, logs: state.logs.join("").slice(-8000) } : { running: false, starting: false, logs: "" }); });
+app.get("/api/projects/:id/run", (req, res) => { const state = runningProjects.get(req.params.id); const alive = Boolean(state && state.process.exitCode === null); res.json(state ? { running: alive && Boolean(state.ready), starting: alive && !state.ready, port: state.port, url: IS_PRODUCTION ? `/api/projects/${req.params.id}/preview/` : `http://localhost:${state.port}`, logs: state.logs.join("").slice(-8000) } : { running: false, starting: false, logs: "" }); });
 app.post("/api/projects/:id/stop", async (req, res) => { const state = runningProjects.get(req.params.id); if (state) { await terminateProcessTree(state.process); runningProjects.delete(req.params.id); } res.json({ ok: true }); });
 app.get("/api/projects/:id/conversation", async (req, res) => {
   try {
@@ -535,7 +553,7 @@ app.get("/{*splat}", async (_req, res, next) => {
   catch { next(); }
 });
 const port = Number(process.env.PORT || 3000);
-const host = process.env.HOST || "127.0.0.1";
+const host = process.env.HOST || (IS_PRODUCTION ? "0.0.0.0" : "127.0.0.1");
 const httpServer = app.listen(port, host, () => console.log("AI Studio API running on http://" + host + ":" + port));
 let shuttingDown = false;
 async function shutdown() {
