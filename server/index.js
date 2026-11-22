@@ -210,7 +210,7 @@ async function allFiles(id) {
 }
 const ENV_FILE = process.env.AI_STUDIO_ENV_PATH || path.join(ROOT, ".env");
 app.post("/api/settings/provider-key", async (req, res) => {
-  if (IS_PRODUCTION) return res.status(403).json({ error: "En producción, configurá las claves como secretos del servicio. No se guardan claves desde el navegador." });
+  if (IS_PRODUCTION && provider !== "openai") return res.status(403).json({ error: "Gemini se administra desde Google AI Studio Secrets." });
   const { provider, apiKey } = req.body || {};
   const envName = provider === "gemini" ? "GEMINI_API_KEY" : provider === "openai" ? "OPENAI_API_KEY" : "";
   if (!envName) return res.status(400).json({ error: "Proveedor no admitido para esta configuración." });
