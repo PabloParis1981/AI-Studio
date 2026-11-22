@@ -13,7 +13,8 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const DATA = path.resolve(process.env.DATA_DIR || path.join(ROOT, "data", "projects"));
-const IS_PRODUCTION = process.env.APP_ENV === "production" || process.env.NODE_ENV === "production";
+const IS_AI_STUDIO = process.env.AI_STUDIO_RUNTIME === "1";
+const IS_PRODUCTION = IS_AI_STUDIO || process.env.APP_ENV === "production" || process.env.NODE_ENV === "production";
 const app = express();
 const MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_BINARY_FILE_BYTES = 7 * 1024 * 1024;
@@ -113,7 +114,7 @@ app.use((req, res, next) => {
     let parsedHost;
     try { parsedHost = new URL("http://" + hostHeader); } catch {}
     const hostname = parsedHost?.hostname?.toLowerCase();
-    if (!isLoopbackAddress(remoteAddress) || !LOCAL_HOSTS.has(hostname)) {
+    if (!IS_AI_STUDIO && (!isLoopbackAddress(remoteAddress) || !LOCAL_HOSTS.has(hostname))) {
       return res.status(403).json({ error: "Este servidor solo acepta conexiones locales." });
     }
   }
