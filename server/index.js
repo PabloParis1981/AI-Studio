@@ -27,7 +27,15 @@ async function startProject(id) {
   try { await fs.access(pkgPath); } catch { throw new Error("Este proyecto no tiene package.json. Pedile al asistente que lo prepare como aplicación web."); }
   const modulesPath = path.join(dir, "node_modules");
   try { await fs.access(modulesPath); } catch {
-    await new Promise((resolve, reject) => { const install = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["install"], { cwd: dir, shell: process.platform === "win32", windowsHide: true }); let output = ""; install.stdout.on("data", (d) => output += d); install.stderr.on("data", (d) => output += d); install.on("error", reject); install.on("close", (code) => code === 0 ? resolve() : reject(new Error("Falló npm install: " + output.slice(-2500)))); });
+    await new Promise((resolve, reject) => {
+      const install = spawn(process.platform === "win32" ? "npm.cmd" : "npm", ["install", "--no-audit", "--no-fund"], { cwd: dir, shell: process.platform === "win32", windowsHide: true });
+      let output = "";
+      const timer = setTimeout(() => { install.kill(); reject(new Error("npm install superó el límite de 180 segundos.")); }, 180000);
+      install.stdout.on("data", (d) => { output += d; if (output.length > 12000) output = output.slice(-12000); });
+      install.stderr.on("data", (d) => { output += d; if (output.length > 12000) output = output.slice(-12000); });
+      install.on("error", (error) => { clearTimeout(timer); reject(error); });
+      install.on("close", (code) => { clearTimeout(timer); code === 0 ? resolve() : reject(new Error("Falló npm install: " + output.slice(-2500))); });
+    });
   }
   const existing = runningProjects.get(id);
   if (existing && existing.process.exitCode === null) return { port: existing.port, url: `http://localhost:${existing.port}`, running: true };
@@ -39,8 +47,16 @@ async function startProject(id) {
   const collect = (chunk) => { state.logs.push(String(chunk)); if (state.logs.length > 100) state.logs.shift(); };
   child.stdout.on("data", collect); child.stderr.on("data", collect);
   child.on("exit", () => { if (runningProjects.get(id) === state) runningProjects.delete(id); });
-  await new Promise((resolve) => setTimeout(resolve, 1200));
-  return { port, url: `http://localhost:${port}`, running: child.exitCode === null, logs: state.logs.join("").slice(-5000) };
+  let ready = false;
+  const deadline = Date.now() + 20000;
+  while (Date.now() < deadline && child.exitCode === null) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(900) });
+      if (response.ok) { ready = true; break; }
+    } catch {}
+    await new Promise((resolve) => setTimeout(resolve, 350));
+  }
+  return { port, url: `http://localhost:${port}`, running: child.exitCode === null && ready, starting: child.exitCode === null && !ready, logs: state.logs.join("").slice(-5000) };
 }
 
 app.use(express.json({ limit: "2mb" }));
