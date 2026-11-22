@@ -44,6 +44,8 @@ try {
   assert.ok(ready, "El servidor no respondió a /api/health. " + logs);
   const health = await call("/api/health");
   assert.equal(health.ok, true);
+  assert.equal(health.apiKeyConfigured, false);
+  await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola" }) }, 503);
 
   const created = await call("/api/projects", { method: "POST", body: JSON.stringify({ name: "Smoke Test" }) });
   const id = created.project.id;
@@ -104,7 +106,7 @@ try {
 
   const listing = await call("/api/projects");
   assert.ok(listing.projects.some((project) => project.id === id && project.name === "Proyecto Renombrado"));
-  console.log("Smoke tests OK: health, projects, bounded text/binary files, conversation, rename, duplicate, secret exclusion, path traversal, project symlink and internal metadata symlink protection.");
+  console.log("Smoke tests OK: health, missing-key handling, projects, bounded text/binary files, conversation, rename, duplicate, secret exclusion, path traversal, project symlink and internal metadata symlink protection.");
 } finally {
   child.kill();
   await Promise.all(createdIds.map((id) => fs.rm(path.join(DATA, id), { recursive: true, force: true }).catch(() => {})));
