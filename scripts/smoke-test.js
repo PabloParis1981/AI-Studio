@@ -53,10 +53,18 @@ try {
   const textFile = await call(`/api/projects/${id}/file?path=src%2Fcheck.txt`);
   assert.equal(textFile.content, "AI Studio smoke test");
 
+  const oversizedText = "x".repeat(2 * 1024 * 1024 + 1);
+  await call(`/api/projects/${id}/file`, { method: "PUT", body: JSON.stringify({ path: "src/too-large.txt", content: oversizedText }) }, 413);
+  await fs.writeFile(path.join(DATA, id, "src", "oversized-existing.txt"), oversizedText);
+  await call(`/api/projects/${id}/file?path=src%2Foversized-existing.txt`, {}, 413);
+
   const binary = Buffer.from([0, 1, 2, 127, 255]).toString("base64");
   await call(`/api/projects/${id}/file-binary`, { method: "POST", body: JSON.stringify({ path: "assets/sample.bin", contentBase64: binary }) });
   const binaryRead = await call(`/api/projects/${id}/file?path=assets%2Fsample.bin&encoding=base64`);
   assert.equal(binaryRead.contentBase64, binary);
+
+  const oversizedBinary = Buffer.alloc(7 * 1024 * 1024 + 1, 7).toString("base64");
+  await call(`/api/projects/${id}/file-binary`, { method: "POST", body: JSON.stringify({ path: "assets/too-large.bin", contentBase64: oversizedBinary }) }, 413);
 
   await call(`/api/projects/${id}/conversation`, { method: "PUT", body: JSON.stringify({ messages: [{ role: "user", content: "Prueba persistente" }] }) });
   const conversation = await call(`/api/projects/${id}/conversation`);
@@ -90,7 +98,7 @@ try {
 
   const listing = await call("/api/projects");
   assert.ok(listing.projects.some((project) => project.id === id && project.name === "Proyecto Renombrado"));
-  console.log("Smoke tests OK: health, projects, text/binary files, conversation, rename, duplicate, secret exclusion, path traversal and symlink protection.");
+  console.log("Smoke tests OK: health, projects, bounded text/binary files, conversation, rename, duplicate, secret exclusion, path traversal and symlink protection.");
 } finally {
   child.kill();
   await Promise.all(createdIds.map((id) => fs.rm(path.join(DATA, id), { recursive: true, force: true }).catch(() => {})));
