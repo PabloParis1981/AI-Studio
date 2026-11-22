@@ -72,7 +72,7 @@ const filePath = (id, relative) => {
   const rel = String(relative || "").replace(/\\/g, "/");
   const target = path.resolve(base, rel);
   if (!rel || (!target.startsWith(base + path.sep) && target !== base)) throw new Error("Ruta de archivo inválida");
-  if (rel.split("/").some((part) => !part || part === ".." || part.startsWith("."))) throw new Error("Ruta de archivo no permitida");
+  if (rel.split("/").some((part) => !part || part === ".." || (part.startsWith(".") && ![".gitignore", ".env.example"].includes(part)))) throw new Error("Ruta de archivo no permitida");
   return target;
 };
 async function ensureProject(id, name) {
@@ -214,7 +214,7 @@ app.post("/api/projects/:id/file-binary", async (req, res) => {
   try {
     const relative = String(req.body?.path || "");
     const encoded = String(req.body?.contentBase64 || "");
-    if (!relative || relative.length > 240 || encoded.length > 10_000_000) return res.status(400).json({ error: "Archivo binario inválido o demasiado grande." });
+    if (!relative || relative.length > 240 || encoded.length > 10_000_000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) return res.status(400).json({ error: "Archivo binario inválido o demasiado grande." });
     const target = filePath(req.params.id, relative);
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, Buffer.from(encoded, "base64"));
