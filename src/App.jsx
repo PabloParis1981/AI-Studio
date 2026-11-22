@@ -82,7 +82,16 @@ export default function App() {
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, busy]);
   async function runProject() {
     setBusy(true); setError(""); setTab("preview");
-    try { if (!saved) await saveFile(); const data = await request(API + "/projects/" + projectId + "/run", { method: "POST" }); setRunInfo(data); if (!data.running) setError(data.logs || "No se pudo iniciar la vista previa."); }
+    try {
+      if (!saved) await saveFile();
+      let data = await request(API + "/projects/" + projectId + "/run", { method: "POST" });
+      for (let attempt = 0; data.starting && attempt < 20; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        data = await request(API + "/projects/" + projectId + "/run");
+      }
+      setRunInfo(data);
+      if (!data.running) setError(data.logs || "La vista previa no llegó a iniciar. Revisá la terminal.");
+    }
     catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
