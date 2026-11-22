@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm:dev:server\" \"npm:dev:web\"",
+    "dev": "npm run build && node server/index.js",
     "dev:server": "node --watch server/index.js",
     "dev:web": "vite --host 127.0.0.1",
     "build": "vite build",

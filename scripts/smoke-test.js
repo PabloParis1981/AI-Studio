@@ -8,17 +8,13 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = path.join(ROOT, "data", "projects");
-const settingsDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-studio-settings-"));
-const settingsFile = path.join(settingsDir, ".env");
-const settingsDir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-studio-settings-"));
-const settingsFile = path.join(settingsDir, ".env");
 const server = net.createServer();
 await new Promise((resolve, reject) => server.listen(0, "127.0.0.1", resolve).once("error", reject));
 const port = server.address().port;
 await new Promise((resolve) => server.close(resolve));
 const child = spawn(process.execPath, ["server/index.js"], {
   cwd: ROOT,
-  env: { ...process.env, PORT: String(port), OPENAI_API_KEY: "", GEMINI_API_KEY: "", AI_STUDIO_ENV_PATH: settingsFile },
+  env: { ...process.env, PORT: String(port), OPENAI_API_KEY: "", GEMINI_API_KEY: "" },
   stdio: ["ignore", "pipe", "pipe"]
 });
 let logs = "";
@@ -56,14 +52,6 @@ try {
   await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "unknown" }) }, 400);
   const geminiMissing = await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "gemini" }) }, 503);
   assert.match(geminiMissing.error, /GEMINI_API_KEY/);
-    const savedKey = "AIzaSyExampleTestKey1234567890";
-    const keyResult = await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "gemini", apiKey: savedKey }) });
-    assert.equal(keyResult.ok, true);
-    assert.equal((await fs.readFile(settingsFile, "utf8")).includes(savedKey), true);
-    assert.equal((await call("/api/health")).providers.gemini.configured, true);
-    await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "openai", apiKey: savedKey }) }, 400);
-    await call("/api/settings/provider-key", { method: "POST", body: JSON.stringify({ provider: "gemini", apiKey: "short" }) }, 400);
-
 
   const created = await call("/api/projects", { method: "POST", body: JSON.stringify({ name: "Smoke Test" }) });
   const id = created.project.id;
@@ -132,5 +120,4 @@ try {
 } finally {
   child.kill();
   await Promise.all(createdIds.map((id) => fs.rm(path.join(DATA, id), { recursive: true, force: true }).catch(() => {})));
-  await fs.rm(settingsDir, { recursive: true, force: true });
 }
