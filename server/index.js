@@ -76,8 +76,6 @@ async function startProject(id) {
   return { port, url: `http://localhost:${port}`, running: child.exitCode === null && ready, starting: child.exitCode === null && !ready, logs: state.logs.join("").slice(-5000) };
 }
 
-app.use(express.json({ limit: "12mb" }));
-
 // This IDE executes project commands and stores provider keys, so its API is loopback-only.
 function isLoopbackAddress(address) {
   const value = String(address || "").toLowerCase().replace(/^::ffff:/, "");
@@ -115,6 +113,8 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+app.use(express.json({ limit: "12mb" }));
 
 const safeId = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 48) || "project";
 const projectDir = (id) => {
