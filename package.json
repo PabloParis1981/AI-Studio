@@ -8,7 +8,8 @@
     "dev:server": "node --watch server/index.js",
     "dev:web": "vite --host 127.0.0.1",
     "build": "vite build",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "test": "node scripts/smoke-test.js"
   },
   "dependencies": {
     "express": "^5.1.0",
