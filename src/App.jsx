@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
-import { Activity, Bot, ChevronDown, ChevronRight, Code2, Download, File, FilePlus2, Folder, FolderPlus, Github, LayoutPanelLeft, Maximize2, MessageSquare, Monitor, Play, Plus, RefreshCw, Send, Settings2, Sparkles, Terminal, Trash2, Upload, WandSparkles, X } from "lucide-react";
+import { Activity, Bot, ChevronDown, ChevronRight, Code2, Download, File, FilePlus2, Folder, FolderPlus, Github, LayoutPanelLeft, Maximize2, MessageSquare, Monitor, Play, Plus, Copy, Pencil, RefreshCw, Send, Settings2, Sparkles, Terminal, Trash2, Upload, WandSparkles, X } from "lucide-react";
 
 const API = "/api";
 const starterHtml = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mi aplicación</title></head><body style="font-family:system-ui;padding:40px"><h1>¡Hola!</h1><p>Tu proyecto empieza aquí.</p></body></html>';
@@ -151,6 +151,26 @@ export default function App() {
     setProjects((p) => [...p, { ...data.project, files: 2 }]); setProjectId(data.project.id);
     setMessages([{ role: "assistant", content: "Proyecto creado. ¿Qué aplicación vamos a construir?" }]);
   }
+  async function renameProject() {
+    if (!project) return;
+    const name = window.prompt("Nuevo nombre del proyecto", project.name);
+    if (!name?.trim() || name.trim() === project.name) return;
+    try {
+      const data = await request(API + "/projects/" + projectId, { method: "PATCH", body: JSON.stringify({ name }) });
+      setProjects((items) => items.map((item) => item.id === projectId ? { ...item, name: data.project.name } : item));
+    } catch (e) { setError(e.message); }
+  }
+  async function duplicateProject() {
+    if (!project) return;
+    if (!saved) await saveFile();
+    const name = window.prompt("Nombre para la copia", project.name + " (copia)");
+    if (!name?.trim()) return;
+    try {
+      const data = await request(API + "/projects/" + projectId + "/duplicate", { method: "POST", body: JSON.stringify({ name }) });
+      setProjects((items) => [...items, data.project]);
+      setProjectId(data.project.id);
+    } catch (e) { setError(e.message); }
+  }
   async function importProjectZip(file) {
     if (!file) return;
     setBusy(true); setError("");
@@ -241,7 +261,7 @@ export default function App() {
   return <div className="app-shell">
     <header className="topbar">
       <div className="brand"><div className="brand-mark"><Sparkles size={18}/></div><div><strong>AI Studio</strong><small>Tu espacio de creación</small></div></div>
-      <div className="top-project"><span>PROYECTO</span><select value={projectId} onChange={(e) => { if (!saved && !window.confirm("Tenés cambios sin guardar. ¿Cambiar de proyecto y descartarlos?")) return; setProjectId(e.target.value); }}>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><button className="icon-button" title="Nuevo proyecto" onClick={createProject}><Plus size={16}/></button></div>
+      <div className="top-project"><span>PROYECTO</span><select value={projectId} onChange={(e) => { if (!saved && !window.confirm("Tenés cambios sin guardar. ¿Cambiar de proyecto y descartarlos?")) return; setProjectId(e.target.value); }}>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><button className="icon-button" title="Renombrar proyecto" onClick={renameProject}><Pencil size={15}/></button><button className="icon-button" title="Duplicar proyecto" onClick={duplicateProject}><Copy size={15}/></button><button className="icon-button" title="Nuevo proyecto" onClick={createProject}><Plus size={16}/></button></div>
       <div className="top-actions"><div className="connection"><i className={health?.apiKeyConfigured ? "online" : ""}/>{health?.apiKeyConfigured ? "IA configurada" : "Falta configurar IA"}</div><button className="icon-button" title="Configuración" onClick={() => setShowSettings(true)}><Settings2 size={17}/></button><a className="icon-button" title="Repositorio GitHub" href="https://github.com/PabloParis1981/AI-Studio" target="_blank" rel="noreferrer"><Github size={17}/></a></div>
     </header>
     {error && <div className="error-banner">{error}<button onClick={() => setError("")}><X size={14}/></button></div>}
