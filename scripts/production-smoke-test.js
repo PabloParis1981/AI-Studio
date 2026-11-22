@@ -51,7 +51,8 @@ try {
   assert.ok(await fs.stat(path.join(dataDir, payload.project.id)));
   console.log("Production smoke tests OK: password challenge, authorized access, wrong-password rejection, provider keys locked to Secret Manager, and configurable persistent data directory.");
 } finally {
-  child.kill();
-  await new Promise((resolve) => child.once("exit", resolve));
+  if (child.exitCode === null) {
+    await new Promise((resolve) => { child.once("exit", resolve); child.kill(); });
+  }
   await fs.rm(temp, { recursive: true, force: true });
 }
