@@ -117,6 +117,24 @@ app.post("/api/projects", async (req, res) => {
 app.post("/api/projects/:id/run", async (req, res) => { try { res.json(await startProject(req.params.id)); } catch (e) { res.status(400).json({ error: e.message }); } });
 app.get("/api/projects/:id/run", (req, res) => { const state = runningProjects.get(req.params.id); res.json(state ? { running: state.process.exitCode === null, port: state.port, url: `http://localhost:${state.port}`, logs: state.logs.join("").slice(-8000) } : { running: false, logs: "" }); });
 app.post("/api/projects/:id/stop", (req, res) => { const state = runningProjects.get(req.params.id); if (state) { state.process.kill(); runningProjects.delete(req.params.id); } res.json({ ok: true }); });
+app.get("/api/projects/:id/conversation", async (req, res) => {
+  try {
+    const dir = await ensureProject(req.params.id);
+    const target = path.join(dir, ".studio", "conversation.json");
+    try { const saved = JSON.parse(await fs.readFile(target, "utf8")); res.json({ messages: Array.isArray(saved.messages) ? saved.messages.slice(-80) : [] }); }
+    catch (e) { if (e.code === "ENOENT") return res.json({ messages: [] }); throw e; }
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.put("/api/projects/:id/conversation", async (req, res) => {
+  try {
+    const dir = await ensureProject(req.params.id);
+    const messages = Array.isArray(req.body?.messages) ? req.body.messages.slice(-80).map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: String(m.content || "").slice(0, 20000) })) : [];
+    const targetDir = path.join(dir, ".studio");
+    await fs.mkdir(targetDir, { recursive: true });
+    await fs.writeFile(path.join(targetDir, "conversation.json"), JSON.stringify({ messages, updatedAt: new Date().toISOString() }, null, 2));
+    res.json({ ok: true, count: messages.length });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
 app.post("/api/projects/:id/terminal", async (req, res) => {
   const command = String(req.body?.command || "").trim();
   if (!command || command.length > 2000) return res.status(400).json({ error: "Escribí un comando válido (máximo 2000 caracteres)." });
