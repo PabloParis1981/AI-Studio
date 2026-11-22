@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
-import { Activity, Bot, ChevronDown, ChevronRight, Code2, Download, File, FilePlus2, Folder, FolderPlus, Github, LayoutPanelLeft, Maximize2, MessageSquare, Monitor, Play, Plus, RefreshCw, Send, Settings2, Sparkles, Terminal, Trash2, WandSparkles, X } from "lucide-react";
+import { Activity, Bot, ChevronDown, ChevronRight, Code2, Download, File, FilePlus2, Folder, FolderPlus, Github, LayoutPanelLeft, Maximize2, MessageSquare, Monitor, Play, Plus, RefreshCw, Send, Settings2, Sparkles, Terminal, Trash2, Upload, WandSparkles, X } from "lucide-react";
 
 const API = "/api";
 const starterHtml = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mi aplicación</title></head><body style="font-family:system-ui;padding:40px"><h1>¡Hola!</h1><p>Tu proyecto empieza aquí.</p></body></html>';
@@ -39,6 +39,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const chatEnd = useRef(null);
+  const zipInput = useRef(null);
   const lastLoadedProject = useRef("");
   const project = projects.find((p) => p.id === projectId);
   const previewDoc = useMemo(() => {
@@ -127,6 +128,50 @@ export default function App() {
     setProjects((p) => [...p, { ...data.project, files: 2 }]); setProjectId(data.project.id);
     setMessages([{ role: "assistant", content: "Proyecto creado. ¿Qué aplicación vamos a construir?" }]);
   }
+  async function importProjectZip(file) {
+    if (!file) return;
+    setBusy(true); setError("");
+    try {
+      if (file.size > 50 * 1024 * 1024) throw new Error("El ZIP supera el límite de 50 MB.");
+      const archive = await JSZip.loadAsync(file);
+      let entries = Object.values(archive.files).filter((entry) => !entry.dir);
+      const roots = [...new Set(entries.map((entry) => entry.name.split("/")[0]))];
+      const hasRootFiles = entries.some((entry) => !entry.name.includes("/"));
+      const stripRoot = roots.length === 1 && !hasRootFiles && entries.every((entry) => entry.name.startsWith(roots[0] + "/"));
+      const files = [];
+      let totalSize = 0;
+      for (const entry of entries) {
+        let relative = stripRoot ? entry.name.slice(roots[0].length + 1) : entry.name;
+        relative = relative.replace(/\\/g, "/");
+        const parts = relative.split("/");
+        if (!relative || relative.startsWith("/") || parts.some((part) => !part || part === "." || part === ".." || part.startsWith(".")) || parts.some((part) => ["node_modules", "dist", ".git"].includes(part))) continue;
+        const size = Number(entry._data?.uncompressedSize || 0);
+        totalSize += size;
+        if (files.length >= 300 || totalSize > 50 * 1024 * 1024) throw new Error("El ZIP contiene demasiados archivos o supera 50 MB descomprimidos.");
+        files.push({ entry, path: relative, size });
+      }
+      if (!files.length) throw new Error("No encontré archivos válidos para importar.");
+      const name = file.name.replace(/\\.zip$/i, "").slice(0, 80) || "Proyecto importado";
+      const created = await request(API + "/projects", { method: "POST", body: JSON.stringify({ name }) });
+      setProjects((p) => [...p, { ...created.project, files: files.length }]);
+      setProjectId(created.project.id);
+      const binaryExt = /\\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|mp3|mp4|pdf|zip|webm)$/i;
+      for (const item of files) {
+        if (item.size > 7 * 1024 * 1024) throw new Error("El archivo " + item.path + " supera el límite individual de 7 MB.");
+        if (binaryExt.test(item.path)) {
+          const base64 = await item.entry.async("base64");
+          await request(API + "/projects/" + created.project.id + "/file-binary", { method: "POST", body: JSON.stringify({ path: item.path, contentBase64: base64 }) });
+        } else {
+          const content = await item.entry.async("string");
+          await request(API + "/projects/" + created.project.id + "/file", { method: "PUT", body: JSON.stringify({ path: item.path, content }) });
+        }
+      }
+      await loadTree(created.project.id);
+      setMessages([{ role: "assistant", content: "Proyecto importado desde ZIP. Ya podés pedirme que lo revise, lo modifique o lo ejecute." }]);
+      setError("");
+    } catch (e) { setError("No se pudo importar el ZIP: " + e.message); }
+    finally { setBusy(false); if (zipInput.current) zipInput.current.value = ""; }
+  }
   async function deleteActiveFile() {
     if (!activeFile || !projectId) return;
     if (!window.confirm("¿Eliminar el archivo " + activeFile + "?")) return;
@@ -177,7 +222,7 @@ export default function App() {
     {error && <div className="error-banner">{error}<button onClick={() => setError("")}><X size={14}/></button></div>}
     <main className="workspace">
       <aside className="sidebar">
-        <div className="side-heading"><span>EXPLORADOR</span><div><button className="tiny-button" title="Exportar proyecto ZIP" onClick={exportProject}><Download size={14}/></button><button className="tiny-button" title="Nuevo archivo" onClick={createFile}><FilePlus2 size={15}/></button><button className="tiny-button" title="Actualizar" onClick={() => loadTree()}><RefreshCw size={14}/></button></div></div>
+        <div className="side-heading"><span>EXPLORADOR</span><div><button className="tiny-button" title="Importar proyecto ZIP" onClick={() => zipInput.current?.click()}><Upload size={14}/></button><button className="tiny-button" title="Exportar proyecto ZIP" onClick={exportProject}><Download size={14}/></button><button className="tiny-button" title="Nuevo archivo" onClick={createFile}><FilePlus2 size={15}/></button><button className="tiny-button" title="Actualizar" onClick={() => loadTree()}><RefreshCw size={14}/></button><input ref={zipInput} type="file" accept=".zip,application/zip" hidden onChange={(e) => importProjectZip(e.target.files?.[0])}/></div></div>
         <div className="project-label"><Folder size={14}/><span>{project?.name || "Proyecto"}</span></div>
         <div className="file-tree"><FileTree nodes={tree} active={activeFile} onOpen={(f) => openFile(f).catch((e) => setError(e.message))}/></div>
         <div className="sidebar-bottom"><div className="side-status"><Activity size={14}/> Espacio local del proyecto</div><div className="side-status"><Activity size={14}/> Archivos guardados en este equipo</div></div>
