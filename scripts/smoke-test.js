@@ -49,6 +49,7 @@ try {
   assert.equal(health.providers.gemini.configured, false);
   assert.equal(health.providers.gemini.model, "gemini-3.8-flash");
   await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "openai" }) }, 503);
+  await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "unknown" }) }, 400);
   const geminiMissing = await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "gemini" }) }, 503);
   assert.match(geminiMissing.error, /GEMINI_API_KEY/);
 
