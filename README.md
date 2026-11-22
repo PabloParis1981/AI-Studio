@@ -1,6 +1,6 @@
 # AI Studio
 
-Un entorno de desarrollo asistido por IA inspirado en Google AI Studio. En lugar de Gemini, el motor que construye y modifica tus proyectos es ChatGPT mediante OpenAI API.
+Un entorno de desarrollo asistido por IA inspirado en Google AI Studio. Permite elegir ChatGPT (OpenAI API) o Gemini (Google Gemini API) como motor de desarrollo, con el mismo proyecto, explorador, editor, terminal, vista previa y herramientas de archivos. Cada conversación conserva el proveedor y modelo seleccionados.
 
 ## Funciones
 
@@ -21,14 +21,14 @@ Un entorno de desarrollo asistido por IA inspirado en Google AI Studio. En lugar
 ## Requisitos
 
 - Node.js 20 o superior.
-- Una clave de API de OpenAI con facturación de API habilitada. La suscripción de ChatGPT no incluye crédito de API.
+- Una o ambas claves: OpenAI API y/o Gemini API. Cada proveedor requiere su propia clave y facturación de API.
 
 ## Ejecutar en Windows
 
 1. Cloná o descargá este repositorio.
 2. Abrí una terminal en la carpeta.
 3. Ejecutá `npm install`.
-4. Copiá `.env.example` como `.env` y configurá `OPENAI_API_KEY`.
+4. Copiá `.env.example` como `.env` y configurá `OPENAI_API_KEY` y/o `GEMINI_API_KEY`.
 5. Ejecutá `npm run dev`.
 6. Abrí http://localhost:5173.
 
@@ -37,7 +37,7 @@ El servidor de la aplicación usa el puerto 8787. Los servidores de vista previa
 ## Configuración
 
 - `OPENAI_API_KEY`: clave privada de API, solo en el servidor.
-- `OPENAI_MODEL`: modelo de OpenAI a utilizar.
+- `OPENAI_MODEL`: modelo de OpenAI a utilizar.\n- `GEMINI_API_KEY`: clave privada de Gemini API, solo en el servidor.\n- `GEMINI_MODEL`: modelo de Gemini (por defecto `gemini-3.8-flash`).\n\nEn el panel del chat podés elegir el proveedor y el modelo para cada proyecto/conversación. El selector informa si falta configurar la clave. Las conversaciones guardan la selección y las claves nunca se envían al navegador.
 - `PORT`: puerto del servidor (8787 por defecto).
 
 ## Seguridad
