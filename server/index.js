@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import net from "node:net";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -205,8 +206,8 @@ app.post("/api/settings/provider-key", async (req, res) => {
     while (lines.length && lines[lines.length - 1] === "") lines.pop();
     lines.push(envName + "=" + JSON.stringify(key));
     const contents = lines.join("\n") + "\n";
-    const tempFile = ENV_FILE + ".tmp-" + process.pid;
-    await fs.writeFile(tempFile, contents, { encoding: "utf8", mode: 0o600 });
+    const tempFile = ENV_FILE + ".tmp-" + process.pid + "-" + randomUUID();
+    await fs.writeFile(tempFile, contents, { encoding: "utf8", mode: 0o600, flag: "wx" });
     await fs.rename(tempFile, ENV_FILE);
     try { await fs.chmod(ENV_FILE, 0o600); } catch {}
     process.env[envName] = key;
