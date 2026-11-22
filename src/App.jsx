@@ -130,7 +130,7 @@ export default function App() {
       if (!saved) await saveFile();
       const listing = await request(API + "/projects/" + projectId + "/files");
       const zip = new JSZip();
-      const binaryExt = /\\.(png|jpe?g|gif|webp|avif|heic|ico|woff2?|ttf|otf|mp3|mp4|mov|webm|wav|ogg|m4a|pdf|zip|wasm|glb|bin)$/i;
+      const binaryExt = /\.(png|jpe?g|gif|webp|avif|heic|ico|woff2?|ttf|otf|mp3|mp4|mov|webm|wav|ogg|m4a|pdf|zip|wasm|glb|bin)$/i;
       for (const file of listing.files) {
         const binary = binaryExt.test(file);
         const data = await request(API + "/projects/" + projectId + "/file?path=" + encodeURIComponent(file) + (binary ? "&encoding=base64" : ""));
@@ -175,12 +175,12 @@ export default function App() {
         files.push({ entry, path: relative, size });
       }
       if (!files.length) throw new Error("No encontré archivos válidos para importar.");
-      const name = file.name.replace(/\\.zip$/i, "").slice(0, 80) || "Proyecto importado";
+      const name = file.name.replace(/\.zip$/i, "").slice(0, 80) || "Proyecto importado";
       if (!saved) await saveFile();
       const created = await request(API + "/projects", { method: "POST", body: JSON.stringify({ name }) });
       setProjects((p) => [...p, { ...created.project, files: files.length }]);
       setProjectId(created.project.id);
-      const binaryExt = /\\.(png|jpe?g|gif|webp|ico|woff2?|ttf|otf|mp3|mp4|pdf|zip|webm)$/i;
+      const binaryExt = /\.(png|jpe?g|gif|webp|avif|heic|ico|woff2?|ttf|otf|mp3|mp4|mov|webm|wav|ogg|m4a|pdf|zip|wasm|glb|bin)$/i;
       for (const item of files) {
         if (binaryExt.test(item.path)) {
           const base64 = await item.entry.async("base64");
