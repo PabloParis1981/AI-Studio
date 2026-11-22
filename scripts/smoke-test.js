@@ -50,6 +50,17 @@ try {
   assert.equal(health.providers.openai.configured, false);
   assert.equal(health.providers.gemini.configured, false);
   assert.equal(health.providers.gemini.model, "gemini-3.8-flash");
+  await call("/api/health", { headers: { Host: "attacker.example" } }, 403);
+  await call("/api/settings/provider-key", {
+    method: "POST",
+    headers: { Origin: "https://attacker.example" },
+    body: JSON.stringify({ provider: "gemini", apiKey: "AIzaSyExampleTestKey1234567890" })
+  }, 403);
+  await call("/api/settings/provider-key", {
+    method: "POST",
+    headers: { "Sec-Fetch-Site": "cross-site" },
+    body: JSON.stringify({ provider: "gemini", apiKey: "AIzaSyExampleTestKey1234567890" })
+  }, 403);
   await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "openai" }) }, 503);
   await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "unknown" }) }, 400);
   const geminiMissing = await call("/api/chat", { method: "POST", body: JSON.stringify({ projectId: "missing-key-test", message: "Hola", provider: "gemini" }) }, 503);
