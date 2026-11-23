@@ -112,9 +112,15 @@ app.use((req, res, next) => {
     if (origin) {
       let parsedOrigin;
       try { parsedOrigin = new URL(origin); } catch {}
-      const hostHeader = String(req.headers.host || "").toLowerCase();
+      // En AI Studio/Cloud Run el proxy puede reenviar la petición con un Host
+      // interno. Comparar el Origin con el host público reenviado por el proxy.
+      const forwardedHost = IS_PRODUCTION
+        ? String(req.headers["x-forwarded-host"] || "").split(",")[0].trim().toLowerCase()
+        : "";
+      const hostHeader = String(forwardedHost || req.headers.host || "").toLowerCase();
       const originAllowed = parsedOrigin && ["http:", "https:"].includes(parsedOrigin.protocol) &&
-        (IS_PRODUCTION ? parsedOrigin.host.toLowerCase() === hostHeader : LOCAL_HOSTS.has(parsedOrigin.hostname.toLowerCase()) && parsedOrigin.host.toLowerCase() === hostHeader);
+        (IS_PRODUCTION ? Boolean(forwardedHost) && parsedOrigin.host.toLowerCase() === hostHeader
+          : LOCAL_HOSTS.has(parsedOrigin.hostname.toLowerCase()) && parsedOrigin.host.toLowerCase() === hostHeader);
       if (!originAllowed) return res.status(403).json({ error: "Origen no permitido." });
     }
   }
