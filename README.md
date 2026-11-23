@@ -56,9 +56,9 @@ Entorno privado de desarrollo asistido por IA para usar desde tu computadora y a
 ## Uso diario
 
 Cada vez que quieras trabajar, hacé doble clic en `INICIAR-AI-STUDIO.bat`. Se abre el servidor local y Chrome con la aplicación en `http://localhost:3000`. También podés iniciarlo manualmente desde PowerShell con `npm run dev`.
-4. Elegí ChatGPT o Gemini en el selector.
-5. Escribí el cambio que necesitás. El asistente modifica los archivos del proyecto.
-6. AI Studio intenta iniciar o actualizar la vista previa automáticamente. También podés usar Ejecutar.
+1. Elegí ChatGPT o Gemini en el selector.
+2. Escribí el cambio que necesitás. El asistente modifica los archivos del proyecto.
+3. AI Studio intenta iniciar o actualizar la vista previa automáticamente. También podés usar Ejecutar.
 
 No necesitás volver a iniciar sesión en cada uso mientras las sesiones locales sigan vigentes.
 
