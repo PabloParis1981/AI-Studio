@@ -233,7 +233,7 @@ app.post("/api/settings/provider-key", async (req, res) => {
 app.get("/api/health", async (_req, res) => {
   try {
     const agents = await getLocalAgentStatus();
-    res.json({ ok: true, service: "ai-studio-personal", mode: "local", agents,
+    res.json({ ok: true, service: "ai-studio-personal", mode: "local", apiKeyConfigured: false, agents,
       providers: {
         codex: { configured: agents.codex.installed && agents.codex.authenticated, model: "ChatGPT (Codex CLI)" },
         openai: { configured: agents.codex.installed && agents.codex.authenticated, model: "ChatGPT (Codex CLI)" },
@@ -241,7 +241,7 @@ app.get("/api/health", async (_req, res) => {
       }
     });
   } catch (error) {
-    res.status(200).json({ ok: true, service: "ai-studio-personal", mode: "local", agents: {}, warning: error.message });
+    res.status(200).json({ ok: true, service: "ai-studio-personal", mode: "local", apiKeyConfigured: false, agents: {}, warning: error.message });
   }
 });
 async function studioFilePath(id, filename) {
@@ -355,10 +355,12 @@ app.get("/api/projects/:id/conversation", async (req, res) => {
     } catch (e) {
       if (e.code !== "ENOENT") throw e;
       if (provider === "codex") {
-        try {
-          const legacy = JSON.parse(await fs.readFile(await studioFilePath(req.params.id, "conversation.json"), "utf8"));
-          return res.json({ messages: Array.isArray(legacy.messages) ? legacy.messages.slice(-80) : [], provider, model: typeof legacy.model === "string" ? legacy.model : "" });
-        } catch (legacyError) { if (legacyError.code !== "ENOENT") throw legacyError; }
+        for (const legacyName of ["conversation-openai.json", "conversation.json"]) {
+          try {
+            const legacy = JSON.parse(await fs.readFile(await studioFilePath(req.params.id, legacyName), "utf8"));
+            return res.json({ messages: Array.isArray(legacy.messages) ? legacy.messages.slice(-80) : [], provider, model: typeof legacy.model === "string" ? legacy.model : "" });
+          } catch (legacyError) { if (legacyError.code !== "ENOENT") throw legacyError; }
+        }
       }
       return res.json({ messages: [], provider, model: "" });
     }
