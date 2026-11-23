@@ -21,7 +21,7 @@ function FileTree({ nodes, active, onOpen, level = 0 }) {
 }
 export default function App() {
   const [health, setHealth] = useState(null);
-  const [provider, setProvider] = useState("openai");
+  const [provider, setProvider] = useState("codex");
   const [modelChoice, setModelChoice] = useState("");
   const [projects, setProjects] = useState([]);
   const [projectId, setProjectId] = useState("");
@@ -264,7 +264,7 @@ export default function App() {
     finally { (isGemini ? setSavingGeminiKey : setSavingOpenaiKey)(false); }
   }
   async function saveGeminiKey() { return saveProviderKey("gemini"); }
-  async function saveOpenaiKey() { return saveProviderKey("openai"); }
+  async function saveOpenaiKey() { return saveProviderKey("codex"); }
   async function sendMessage() {
     const text = prompt.trim();
     if (!text || busy || !projectId) return;
@@ -286,6 +286,7 @@ export default function App() {
         setError("La respuesta se completó, pero no pude actualizar el explorador: " + refreshError.message);
       }
       setTab("preview");
+      await runProject();
     } catch (e) { const updatedMessages = [...messages, { role: "user", content: text }, { role: "assistant", content: "No pude completar el pedido: " + e.message }]; setMessages(updatedMessages); request(API + "/projects/" + projectId + "/conversation", { method: "PUT", body: JSON.stringify({ messages: updatedMessages, provider, model: modelChoice }) }).catch(() => {}); }
     finally { setBusy(false); }
   }
@@ -314,14 +315,14 @@ export default function App() {
     <header className="topbar studio-topbar">
       <div className="studio-brand"><button className="back-button" title="Volver a vista previa" onClick={() => setWorkspaceMode("preview")}><Sparkles size={19}/><span>AI Studio</span></button></div>
       <div className="studio-project"><span>PROYECTO</span><select value={projectId} disabled={busy || terminalBusy} onChange={(e) => { if (!saved && !window.confirm("Tenés cambios sin guardar. ¿Cambiar de proyecto y descartarlos?")) return; setProjectId(e.target.value); }}>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select><button className="studio-icon" title="Renombrar proyecto" disabled={busy || terminalBusy} onClick={renameProject}><Pencil size={15}/></button><button className="studio-icon" title="Duplicar proyecto" disabled={busy || terminalBusy} onClick={duplicateProject}><Copy size={15}/></button><button className="studio-icon" title="Nuevo proyecto" disabled={busy || terminalBusy} onClick={createProject}><Plus size={17}/></button></div>
-      <div className="studio-top-actions"><span className="connection"><i className={health?.providers?.[provider]?.configured ? "online" : ""}/>{health?.providers?.[provider]?.configured ? "IA conectada" : "Falta configurar IA"}</span><button className="studio-icon" title="Configuración" onClick={() => setShowSettings(true)}><Settings2 size={18}/></button><a className="studio-icon" title="Repositorio GitHub" href="https://github.com/PabloParis1981/AI-Studio" target="_blank" rel="noreferrer"><Github size={18}/></a></div>
+      <div className="studio-top-actions"><span className="connection"><i className={health?.providers?.[provider]?.configured ? "online" : ""}/>{health?.agents?.[provider]?.message || "Comprobando asistentes locales…"}</span><button className="studio-icon" title="Configuración" onClick={() => setShowSettings(true)}><Settings2 size={18}/></button><a className="studio-icon" title="Repositorio GitHub" href="https://github.com/PabloParis1981/AI-Studio" target="_blank" rel="noreferrer"><Github size={18}/></a></div>
     </header>
     {error && <div className="error-banner">{error}<button onClick={() => setError("")}><X size={14}/></button></div>}
     {workspaceMode === "preview" && <main className="studio-workspace">
       <aside className="studio-assistant">
-        <div className="studio-assistant-head"><div className="studio-gemini-mark"><Bot size={19}/></div><div><strong>{provider === "gemini" ? "Gemini" : "ChatGPT"}</strong><small>Asistente de desarrollo · {provider === "gemini" ? "Google" : "OpenAI"}</small></div><span className="studio-model">{modelChoice || health?.providers?.[provider]?.model || "Modelo"}</span></div>
-        <div className="studio-engine-row"><label>MOTOR</label><select value={provider} disabled={busy} onChange={(e) => { const next=e.target.value; setProvider(next); setModelChoice(health?.providers?.[next]?.model || ""); }}><option value="openai">ChatGPT · OpenAI</option><option value="gemini">Gemini · Google</option></select><label>MODELO</label><select value={modelChoice || health?.providers?.[provider]?.model || ""} disabled={busy} onChange={(e) => setModelChoice(e.target.value)}>{(provider === "gemini" ? ["gemini-3.8-flash"] : [health?.providers?.openai?.model || "gpt-6.2-astra"]).map((m)=><option key={m} value={m}>{m}</option>)}</select></div>
-        <div className="studio-key-status"><i className={health?.providers?.[provider]?.configured ? "ready" : ""}/>{health?.providers?.[provider]?.configured ? "Conectado" : "Falta configurar API key"}</div>
+        <div className="studio-assistant-head"><div className="studio-gemini-mark"><Bot size={19}/></div><div><strong>{provider === "gemini" ? "Gemini" : "ChatGPT"}</strong><small>Asistente de desarrollo · {provider === "gemini" ? "Google · local" : "ChatGPT · local"}</small></div><span className="studio-model">{modelChoice || health?.providers?.[provider]?.model || "Modelo"}</span></div>
+        <div className="studio-engine-row"><label>MOTOR</label><select value={provider} disabled={busy} onChange={(e) => { const next=e.target.value; setProvider(next); setModelChoice(health?.providers?.[next]?.model || ""); }}><option value="codex">ChatGPT · Codex local</option><option value="gemini">Gemini · Google</option></select><label>MODELO</label><select value={modelChoice || health?.providers?.[provider]?.model || ""} disabled={busy} onChange={(e) => setModelChoice(e.target.value)}>{(provider === "gemini" ? ["Gemini (tu cuenta)"] : [health?.providers?.codex?.model || "ChatGPT (tu cuenta)"]).map((m)=><option key={m} value={m}>{m}</option>)}</select></div>
+        <div className="studio-key-status"><i className={health?.providers?.[provider]?.configured ? "ready" : ""}/>{health?.agents?.[provider]?.message || "Comprobando…"}</div>
         <div className="studio-chat-context"><WandSparkles size={15}/><span>{provider === "gemini" ? "Gemini" : "ChatGPT"} puede crear, editar y ejecutar tu aplicación.</span></div>
         <div className="studio-messages">{messages.map((m,i)=><div key={i} className={"message "+m.role}><div className="message-avatar">{m.role==="assistant"?<Sparkles size={14}/>:"T"}</div><div className="message-content"><div className="message-role">{m.role==="assistant"?(provider==="gemini"?"GEMINI":"CHATGPT"):"VOS"}</div><p>{m.content}</p></div></div>)}{busy && <div className="thinking"><span/><span/><span/> La IA está trabajando en tu proyecto...</div>}<div ref={chatEnd}/></div>
         <div className="studio-composer"><label>Describí qué querés crear o modificar</label><textarea value={prompt} onChange={(e)=>setPrompt(e.target.value)} onKeyDown={(e)=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendMessage();}}} placeholder="Ej.: Creá una aplicación moderna para..." rows={4}/><div className="studio-composer-footer"><span><Sparkles size={13}/> {provider==="gemini"?"Gemini":"ChatGPT"} puede escribir y ejecutar código</span><button className="send-button" disabled={!prompt.trim()||busy} onClick={sendMessage}><Send size={15}/> Enviar</button></div></div>
@@ -352,13 +353,13 @@ export default function App() {
         <div className="provider-toolbar">
           <label>Motor</label>
           <select value={provider} disabled={busy} onChange={(e) => { const next = e.target.value; setProvider(next); setModelChoice(health?.providers?.[next]?.model || ""); }}>
-            <option value="openai">ChatGPT · OpenAI</option><option value="gemini">Gemini · Google</option>
+            <option value="codex">ChatGPT · Codex local</option><option value="gemini">Gemini · Google</option>
           </select>
           <label>Modelo</label>
           <select value={modelChoice || health?.providers?.[provider]?.model || ""} disabled={busy} onChange={(e) => setModelChoice(e.target.value)}>
-            {(provider === "gemini" ? ["gemini-3.8-flash"] : [health?.providers?.openai?.model || "gpt-6.2-astra"]).map((model) => <option key={model} value={model}>{model}</option>)}
+            {(provider === "gemini" ? ["Gemini (tu cuenta)"] : [health?.providers?.codex?.model || "ChatGPT (tu cuenta)"]).map((model) => <option key={model} value={model}>{model}</option>)}
           </select>
-          <span className={health?.providers?.[provider]?.configured ? "provider-ready" : "provider-missing"}>{health?.providers?.[provider]?.configured ? "Conectado" : "Falta API key"}</span>
+          <span className={health?.providers?.[provider]?.configured ? "provider-ready" : "provider-missing"}>{health?.providers?.[provider]?.configured ? "Conectado" : "Falta iniciar sesión"}</span>
         </div>
         <div className="chat-context"><WandSparkles size={14}/><span>{provider === "gemini" ? "Gemini" : "ChatGPT"} construye, edita y ejecuta tu aplicación con las mismas herramientas del proyecto</span></div>
         <div className="messages">
@@ -368,6 +369,6 @@ export default function App() {
         <div className="chat-composer"><div className="composer-hint">Describí el cambio o la aplicación que querés crear</div><textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }} placeholder="Ej.: Creá una landing page moderna..." rows={3}/><div className="composer-footer"><span><Sparkles size={13}/> {provider === "gemini" ? "Gemini" : "ChatGPT"} puede escribir y ejecutar código</span><button className="send-button" disabled={!prompt.trim() || busy} onClick={sendMessage}><Send size={15}/> Enviar</button></div></div>
       </aside>
     </main>
-    {showSettings && <div className="modal-backdrop" onClick={() => setShowSettings(false)}><div className="settings-modal" onClick={(e) => e.stopPropagation()}><div className="modal-title"><strong>Configuración</strong><button className="icon-button" onClick={() => setShowSettings(false)}><X size={17}/></button></div><div className="setting-row"><Sparkles size={18}/><div><strong>Motores de IA</strong><p>Estado del servidor: OpenAI {health?.providers?.openai?.configured ? "conectado" : "sin configurar"} · Gemini {health?.providers?.gemini?.configured ? "conectado" : "sin configurar"}.</p><p><strong>OpenAI:</strong> si AI Studio no entrega el secreto al servidor, podés cargar la clave acá. Se guarda únicamente en el archivo privado del servidor (<code>.env</code>), protegido por el acceso de esta aplicación; no se muestra ni se incorpora al repositorio.</p><div style={{display:"flex",gap:8,flexWrap:"wrap",margin:"10px 0"}}><input type="password" autoComplete="off" value={openaiKeyInput} onChange={(e)=>setOpenaiKeyInput(e.target.value)} placeholder="Pegá tu nueva clave OpenAI" aria-label="Clave API de OpenAI" style={{flex:"1 1 240px",minWidth:0,padding:"10px 12px",borderRadius:8,border:"1px solid var(--border, #555)",background:"var(--panel, #fff)",color:"inherit"}}/><button className="send-button" disabled={!openaiKeyInput.trim()||savingOpenaiKey} onClick={saveOpenaiKey}>{savingOpenaiKey ? "Guardando…" : "Guardar clave OpenAI"}</button></div><p><strong>Gemini:</strong> sigue administrado automáticamente por Google AI Studio. No hace falta tocarlo. La facturación de OpenAI es independiente.</p></div></div><div className="setting-row"><Github size={18}/><div><strong>Repositorio</strong><p>Este proyecto vive en PabloParis1981/AI-Studio. La sincronización GitHub está en desarrollo.</p><a href="https://github.com/PabloParis1981/AI-Studio" target="_blank" rel="noreferrer">Abrir repositorio ↗</a></div></div></div></div>}
+    {showSettings && <div className="modal-backdrop" onClick={() => setShowSettings(false)}><div className="settings-modal" onClick={(e) => e.stopPropagation()}><div className="modal-title"><strong>Conexión de asistentes locales</strong><button className="icon-button" onClick={() => setShowSettings(false)}><X size={17}/></button></div><div className="setting-row"><Sparkles size={18}/><div><strong>ChatGPT mediante Codex</strong><p>{health?.agents?.codex?.message || "Estado no disponible"}</p><p>Usa tu cuenta ChatGPT con el acceso incluido en tu plan. No requiere API Key ni facturación de API.</p><code>npm install -g @openai/codex</code><br/><code>codex login</code></div></div><div className="setting-row"><Bot size={18}/><div><strong>Gemini mediante Gemini CLI</strong><p>{health?.agents?.gemini?.message || "Estado no disponible"}</p><p>Usa el inicio de sesión de Google y la cuota gratuita disponible para cuentas personales, sujeta a límites de uso.</p><code>npm install -g @google/gemini-cli</code><br/><code>gemini</code></div></div><div className="setting-row"><Github size={18}/><div><strong>Repositorio y privacidad</strong><p>El servidor y los proyectos funcionan en esta computadora. No publiques esta instancia en Internet.</p><a href="https://github.com/PabloParis1981/AI-Studio" target="_blank" rel="noreferrer">Abrir repositorio ↗</a></div></div></div></div>}
   </div>;
 }
