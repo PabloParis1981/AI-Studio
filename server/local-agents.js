@@ -43,6 +43,7 @@ function runCommand(command, args, options = {}) {
     });
     child.once("error", (error) => finish({ ok: false, code: null, stdout, stderr, error: error.code === "ENOENT" ? "No encuentro el comando " + command + ". Instalalo y reiniciá AI Studio." : error.message }));
     child.once("close", (code) => finish({ ok: code === 0, code, stdout, stderr, error: code === 0 ? "" : (stderr.trim() || stdout.trim() || "El asistente terminó con código " + code) }));
+    child.stdin.on("error", () => {});
     if (options.input) child.stdin.end(options.input);
     else child.stdin.end();
   });
