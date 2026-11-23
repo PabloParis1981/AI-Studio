@@ -41,10 +41,6 @@ export default function App() {
   const [terminalBusy, setTerminalBusy] = useState(false);
   const [error, setError] = useState("");
   const [showSettings, setShowSettings] = useState(false);
-  const [geminiKeyInput, setGeminiKeyInput] = useState("");
-  const [openaiKeyInput, setOpenaiKeyInput] = useState("");
-  const [savingGeminiKey, setSavingGeminiKey] = useState(false);
-  const [savingOpenaiKey, setSavingOpenaiKey] = useState(false);
   const chatEnd = useRef(null);
   const zipInput = useRef(null);
   const lastLoadedProject = useRef("");
@@ -248,23 +244,6 @@ export default function App() {
     await request(API + "/projects/" + projectId + "/file", { method: "POST", body: JSON.stringify({ path: name, content: "" }) });
     await loadTree(); await openFile(name);
   }
-  async function saveProviderKey(provider) {
-    const isGemini = provider === "gemini";
-    const key = (isGemini ? geminiKeyInput : openaiKeyInput).trim();
-    const saving = isGemini ? savingGeminiKey : savingOpenaiKey;
-    if (!key || saving) return;
-    (isGemini ? setSavingGeminiKey : setSavingOpenaiKey)(true); setError("");
-    try {
-      await request(API + "/settings/provider-key", { method: "POST", body: JSON.stringify({ provider, apiKey: key }) });
-      (isGemini ? setGeminiKeyInput : setOpenaiKeyInput)("");
-      const updatedHealth = await request(API + "/health");
-      setHealth(updatedHealth);
-      setProvider(provider);
-    } catch (e) { setError(e.message); }
-    finally { (isGemini ? setSavingGeminiKey : setSavingOpenaiKey)(false); }
-  }
-  async function saveGeminiKey() { return saveProviderKey("gemini"); }
-  async function saveOpenaiKey() { return saveProviderKey("codex"); }
   async function sendMessage() {
     const text = prompt.trim();
     if (!text || busy || !projectId) return;
@@ -349,7 +328,7 @@ export default function App() {
         </div>
       </section>
       <aside className="chat-panel">
-        <div className="chat-heading"><div className="chat-heading-icon"><Bot size={17}/></div><div><strong>{provider === "gemini" ? "Gemini" : "ChatGPT"}</strong><small>Motor de desarrollo · {provider === "gemini" ? "Google" : "OpenAI"}</small></div><span className="model-pill">{modelChoice || health?.providers?.[provider]?.model || (provider === "gemini" ? "GEMINI" : "OPENAI")}</span></div>
+        <div className="chat-heading"><div className="chat-heading-icon"><Bot size={17}/></div><div><strong>{provider === "gemini" ? "Gemini" : "ChatGPT"}</strong><small>Motor de desarrollo · {provider === "gemini" ? "Google · local" : "ChatGPT · local"}</small></div><span className="model-pill">{modelChoice || health?.providers?.[provider]?.model || (provider === "gemini" ? "GEMINI" : "CHATGPT")}</span></div>
         <div className="provider-toolbar">
           <label>Motor</label>
           <select value={provider} disabled={busy} onChange={(e) => { const next = e.target.value; setProvider(next); setModelChoice(health?.providers?.[next]?.model || ""); }}>
