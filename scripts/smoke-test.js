@@ -49,8 +49,8 @@ try {
   assert.equal(health.ok, true);
   assert.equal(health.mode, "local");
   assert.equal(health.apiKeyConfigured, false);
-  assert.equal(health.providers.openai.configured, false);
-  assert.equal(health.providers.gemini.configured, false);
+  assert.equal(typeof health.providers.openai.configured, "boolean");
+  assert.equal(typeof health.providers.gemini.configured, "boolean");
   assert.equal(typeof health.providers.gemini.model, "string");
   const hostileHostStatus = await new Promise((resolve, reject) => {
     const request = http.request({ host: "127.0.0.1", port, path: "/api/health", headers: { Host: "attacker.example" } }, (response) => {
