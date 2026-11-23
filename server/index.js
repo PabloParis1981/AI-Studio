@@ -235,6 +235,7 @@ app.get("/api/health", async (_req, res) => {
     const agents = await getLocalAgentStatus();
     res.json({ ok: true, service: "ai-studio-personal", mode: "local", agents,
       providers: {
+        codex: { configured: agents.codex.installed && agents.codex.authenticated, model: "ChatGPT (Codex CLI)" },
         openai: { configured: agents.codex.installed && agents.codex.authenticated, model: "ChatGPT (Codex CLI)" },
         gemini: { configured: agents.gemini.installed && agents.gemini.authenticated, model: "Gemini CLI" }
       }
