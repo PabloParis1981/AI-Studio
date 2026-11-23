@@ -559,7 +559,7 @@ app.post("/api/chat", async (req, res) => {
     const safeHistory = Array.isArray(history) ? history.filter((item) => ["user", "assistant"].includes(item?.role)).slice(-12).map((item) => ({ role: item.role, content: String(item.content || "").slice(0, 10000) })) : [];
     const directory = await ensureProject(projectId);
     const answer = await runLocalAgent({ provider, projectDir: directory, message: String(message).slice(0, 12000), history: safeHistory });
-    res.json({ answer, provider, model: provider === "codex" ? "ChatGPT · Codex CLI" : "Gemini CLI", files: await allFiles(projectId) });
+    res.json({ answer, provider, model: provider === "codex" ? "ChatGPT (Codex CLI)" : "Gemini CLI", files: await allFiles(projectId) });
   } catch (error) {
     const safeMessage = String(error?.message || "No se pudo completar la tarea.");
     console.error("[AI Studio Personal] Error en " + provider + ": " + safeMessage);
