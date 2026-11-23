@@ -346,14 +346,14 @@ app.post("/api/projects/:id/stop", async (req, res) => { const state = runningPr
 app.get("/api/projects/:id/conversation", async (req, res) => {
   try {
     await ensureProject(req.params.id);
-    const provider = req.query.provider === "gemini" ? "gemini" : "openai";
+    const provider = req.query.provider === "gemini" ? "gemini" : "codex";
     const target = await studioFilePath(req.params.id, "conversation-" + provider + ".json");
     try {
       const saved = JSON.parse(await fs.readFile(target, "utf8"));
       res.json({ messages: Array.isArray(saved.messages) ? saved.messages.slice(-80) : [], provider, model: typeof saved.model === "string" ? saved.model : "" });
     } catch (e) {
       if (e.code !== "ENOENT") throw e;
-      if (provider === "openai") {
+      if (provider === "codex") {
         try {
           const legacy = JSON.parse(await fs.readFile(await studioFilePath(req.params.id, "conversation.json"), "utf8"));
           return res.json({ messages: Array.isArray(legacy.messages) ? legacy.messages.slice(-80) : [], provider, model: typeof legacy.model === "string" ? legacy.model : "" });
@@ -367,7 +367,7 @@ app.put("/api/projects/:id/conversation", async (req, res) => {
   try {
     const dir = await ensureProject(req.params.id);
     const messages = Array.isArray(req.body?.messages) ? req.body.messages.slice(-80).map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: String(m.content || "").slice(0, 20000) })) : [];
-    const provider = req.body?.provider === "gemini" ? "gemini" : "openai";
+    const provider = req.body?.provider === "gemini" ? "gemini" : "codex";
     const model = String(req.body?.model || "").slice(0, 100);
     const target = await studioFilePath(req.params.id, "conversation-" + provider + ".json");
     await fs.writeFile(target, JSON.stringify({ messages, provider, model, updatedAt: new Date().toISOString() }, null, 2));
