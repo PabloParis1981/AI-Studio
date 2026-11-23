@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import { GoogleGenAI } from "@google/genai";
+import { getLocalAgentStatus, runLocalAgent } from "./local-agents.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -229,15 +230,19 @@ app.post("/api/settings/provider-key", async (req, res) => {
     res.status(500).json({ error: "No pude guardar la clave localmente: " + error.message });
   }
 });
-app.get("/api/health", (_req, res) => res.json({
-  ok: true, service: "ai-studio",
-  providers: {
-    openai: { configured: Boolean(process.env.OPENAI_API_KEY), model: process.env.OPENAI_MODEL || "gpt-6.2-astra" },
-    gemini: { configured: Boolean(process.env.GEMINI_API_KEY), model: process.env.GEMINI_MODEL || "gemini-3.8-flash" }
-  },
-  model: process.env.OPENAI_MODEL || "gpt-6.2-astra",
-  apiKeyConfigured: Boolean(process.env.OPENAI_API_KEY)
-}));
+app.get("/api/health", async (_req, res) => {
+  try {
+    const agents = await getLocalAgentStatus();
+    res.json({ ok: true, service: "ai-studio-personal", mode: "local", agents,
+      providers: {
+        openai: { configured: agents.codex.installed && agents.codex.authenticated, model: "ChatGPT (Codex CLI)" },
+        gemini: { configured: agents.gemini.installed && agents.gemini.authenticated, model: "Gemini CLI" }
+      }
+    });
+  } catch (error) {
+    res.status(200).json({ ok: true, service: "ai-studio-personal", mode: "local", agents: {}, warning: error.message });
+  }
+});
 async function studioFilePath(id, filename) {
   const project = projectDir(id);
   const projectStat = await fs.lstat(project);
@@ -534,31 +539,27 @@ async function runGemini({ apiKey, model, projectId, message, history }) {
 }
 app.post("/api/chat", async (req, res) => {
   const { projectId, message, history = [] } = req.body || {};
-  const requestedProvider = req.body?.provider ?? "openai";
-  if (!["openai", "gemini"].includes(requestedProvider)) return res.status(400).json({ error: "Proveedor de IA inválido. Elegí openai o gemini." });
-  const provider = requestedProvider;
-  const configuredKey = provider === "gemini" ? process.env.GEMINI_API_KEY : process.env.OPENAI_API_KEY;
-  if (!configuredKey) return res.status(503).json({ error: provider === "gemini" ? "Falta configurar GEMINI_API_KEY en el archivo .env del servidor." : "Falta configurar OPENAI_API_KEY en el archivo .env del servidor." });
+  const requestedProvider = req.body?.provider ?? "codex";
+  const provider = requestedProvider === "openai" ? "codex" : requestedProvider;
+  if (!["codex", "gemini"].includes(provider)) return res.status(400).json({ error: "Proveedor inválido. Elegí ChatGPT o Gemini." });
+  if (IS_PRODUCTION) return res.status(503).json({ error: "Los asistentes locales funcionan en tu computadora. Descargá el proyecto y ejecutá AI Studio en tu PC." });
   if (!projectId || !String(message || "").trim()) return res.status(400).json({ error: "Falta el proyecto o el mensaje." });
-  const defaultModel = provider === "gemini" ? (process.env.GEMINI_MODEL || "gemini-3.8-flash") : (process.env.OPENAI_MODEL || "gpt-6.2-astra");
-  const requestedModel = String(req.body?.model || defaultModel).trim();
-  const model = requestedModel.slice(0, 100);
   try {
-    const safeHistory = Array.isArray(history) ? history.filter((item) => ["user", "assistant"].includes(item?.role)).slice(-10).map((item) => ({ role: item.role, content: String(item.content || "").slice(0, 12000) })) : [];
-    const answer = provider === "gemini"
-      ? await runGemini({ apiKey: configuredKey, model, projectId, message: String(message).slice(0, 12000), history: safeHistory })
-      : await runOpenAI({ apiKey: configuredKey, model, projectId, message: String(message).slice(0, 12000), history: safeHistory });
-    res.json({ answer, provider, model, files: await allFiles(projectId) });
+    const agents = await getLocalAgentStatus();
+    const status = agents[provider];
+    if (!status?.installed) return res.status(503).json({ error: provider === "codex"
+      ? "Falta instalar Codex CLI. En PowerShell ejecutá: npm install -g @openai/codex"
+      : "Falta instalar Gemini CLI. En PowerShell ejecutá: npm install -g @google/gemini-cli" });
+    if (!status.authenticated) return res.status(503).json({ error: provider === "codex"
+      ? "Primero iniciá sesión en ChatGPT. Abrí PowerShell, ejecutá: codex login"
+      : "Primero iniciá sesión con tu cuenta Google. Abrí PowerShell, ejecutá: gemini y elegí «Sign in with Google»." });
+    const safeHistory = Array.isArray(history) ? history.filter((item) => ["user", "assistant"].includes(item?.role)).slice(-12).map((item) => ({ role: item.role, content: String(item.content || "").slice(0, 10000) })) : [];
+    const directory = await ensureProject(projectId);
+    const answer = await runLocalAgent({ provider, projectDir: directory, message: String(message).slice(0, 12000), history: safeHistory });
+    res.json({ answer, provider, model: provider === "codex" ? "ChatGPT · Codex CLI" : "Gemini CLI", files: await allFiles(projectId) });
   } catch (error) {
-    let message = error?.message || error?.error?.message || error?.response?.data?.error?.message;
-    if (!message && typeof error === "string") message = error;
-    if (!message) {
-      try { message = JSON.stringify(error); } catch {}
-    }
-    if (!message || message === "{}") message = "Gemini no devolvió un mensaje de error legible. Revisá la configuración de la API y los permisos de la clave.";
-    const safeMessage = String(message).replaceAll(configuredKey, "[API key oculta]");
-    const status = error?.status || error?.statusCode || error?.response?.status || "sin estado";
-    console.error(`[AI Studio] Error en proveedor ${provider} (HTTP ${status}): ${safeMessage}`);
+    const safeMessage = String(error?.message || "No se pudo completar la tarea.");
+    console.error("[AI Studio Personal] Error en " + provider + ": " + safeMessage);
     res.status(500).json({ error: safeMessage });
   }
 });
