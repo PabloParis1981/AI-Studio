@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "npm run build && node scripts/start-aistudio.js",
+    "dev": "npm run build && node server/index.js",
     "dev:server": "node --watch server/index.js",
     "dev:web": "vite --host 127.0.0.1",
     "build": "vite build",
     "start": "node server/index.js",
-    "test": "node scripts/smoke-test.js && node scripts/production-smoke-test.js"
+    "test": "node scripts/smoke-test.js && node scripts/production-smoke-test.js",
+    "setup:agents": "npm install -g @openai/codex @google/gemini-cli"
   },
   "dependencies": {
     "express": "^5.1.0",
