@@ -19,6 +19,6 @@ if not exist "node_modules\vite" (
   )
 )
 
-start "" powershell -NoProfile -WindowStyle Hidden -Command "Start-Sleep -Seconds 4; Start-Process 'http://localhost:3000'"
+start "" /b powershell -NoProfile -WindowStyle Hidden -Command "$deadline=(Get-Date).AddMinutes(2); while((Get-Date) -lt $deadline){try{$r=Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:3000/api/health' -TimeoutSec 2; if($r.StatusCode -eq 200){Start-Process 'http://localhost:3000'; exit}}catch{}; Start-Sleep -Seconds 1}"
 call npm run dev
 pause
