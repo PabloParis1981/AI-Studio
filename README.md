@@ -1,97 +1,93 @@
-# AI Studio
+# AI Studio Personal
 
-Un entorno de desarrollo asistido por IA inspirado en Google AI Studio. Permite elegir ChatGPT (OpenAI API) o Gemini (Google Gemini API) como motor de desarrollo, con el mismo proyecto, explorador, editor, terminal, vista previa y herramientas de archivos. Cada conversación conserva el proveedor y modelo seleccionados.
+Entorno privado de desarrollo asistido por IA para usar desde tu computadora y abrir en Chrome. Incluye dos asistentes locales: ChatGPT mediante Codex CLI y Gemini mediante Gemini CLI. Ambos trabajan directamente sobre los archivos del proyecto activo y comparten editor, terminal y vista previa.
 
-## Funciones
+## Qué incluye
 
-- Espacio de trabajo con explorador de archivos, editor de código, chat y vista previa.
-- Proyectos React + Vite creados con una estructura funcional.
-- ChatGPT y Gemini pueden listar, leer, crear y modificar archivos del proyecto mediante las mismas herramientas.
-- Conversaciones guardadas por proyecto y restauradas al volver a abrirlo.
-- Ejecución real de cada aplicación mediante un servidor Vite independiente.
-- Instalación automática de dependencias al ejecutar un proyecto, con límite de tiempo.
-- Vista previa en vivo que espera a que el servidor responda antes de marcarse como iniciada.
-- Guardado automático del editor después de una breve pausa, además del guardado manual.
-- Protección de cambios pendientes al ejecutar la aplicación o cambiar de proyecto.
-- Terminal interactiva para ejecutar comandos dentro de la carpeta del proyecto.
-- Importación y exportación ZIP del proyecto, con soporte para recursos binarios y exclusión de archivos sensibles.
-- La vista previa consulta el estado del servidor cuando tarda más de lo habitual.
-- Archivos y proyectos guardados localmente en `data/projects`.
+- ChatGPT conectado mediante inicio de sesión con tu cuenta ChatGPT (Codex CLI), sin API Key.
+- Gemini conectado mediante inicio de sesión con tu cuenta Google (Gemini CLI), sin API Key.
+- Los dos asistentes trabajan sobre la misma carpeta del proyecto.
+- Explorador de archivos, editor, terminal, proyectos, historial y vista previa Vite.
+- Proyectos almacenados localmente en `data/projects`.
+- Servidor limitado a `127.0.0.1`: no queda publicado en Internet ni accesible desde otros equipos.
 
 ## Requisitos
 
+- Windows 10/11.
 - Node.js 20 o superior.
-- Una o ambas claves: OpenAI API y/o Gemini API. Cada proveedor requiere su propia clave y facturación de API.
+- Cuenta ChatGPT con acceso a Codex. Los límites dependen del plan.
+- Cuenta Google personal para el nivel gratuito de Gemini CLI, sujeto a límites de uso y disponibilidad.
 
-## Ejecutar en Windows
+## Primera instalación en Windows
 
-1. Cloná o descargá este repositorio.
-2. Abrí una terminal en la carpeta.
-3. Ejecutá `npm install`.
-4. Copiá `.env.example` como `.env` y configurá `OPENAI_API_KEY` y/o `GEMINI_API_KEY`, o guardá las claves desde Configuración dentro de la aplicación.
-5. Ejecutá `npm run dev`.
-6. Abrí http://localhost:3000.
+1. Descargá este repositorio desde GitHub y descomprimilo.
+2. Abrí PowerShell dentro de la carpeta `AI-Studio`.
+3. Ejecutá:
 
-`npm run dev` compila la interfaz y luego inicia el servidor Express. El servidor escucha en `127.0.0.1` y usa el puerto `3000` por defecto (`PORT` permite cambiarlo). Los servidores Vite de vista previa de los proyectos se asignan automáticamente desde el puerto `5180`.
+   ```powershell
+   npm install
+   npm run setup:agents
+   ```
 
-## Configuración
+4. Iniciá sesión en ChatGPT:
 
-- `OPENAI_API_KEY`: clave privada de OpenAI API, solo en el servidor.
-- `OPENAI_MODEL`: modelo de OpenAI a utilizar.
-- `GEMINI_API_KEY`: clave privada de Gemini API, solo en el servidor.
-- `GEMINI_MODEL`: modelo de Gemini (por defecto `gemini-3.8-flash`).
-- `PORT`: puerto del servidor (3000 por defecto).
+   ```powershell
+   codex login
+   ```
 
-También podés guardar las claves desde Configuración dentro de la aplicación. Se escriben en el archivo `.env` local, con permisos privados en sistemas compatibles, y nunca se devuelven al navegador. La facturación de las API es independiente de una suscripción a ChatGPT o Google AI Studio.
+   Se abrirá el navegador para autorizar tu cuenta ChatGPT.
 
-En el panel del chat podés elegir el proveedor y el modelo para cada conversación. El selector informa si falta configurar la clave.
+5. Iniciá sesión en Google:
 
-## Seguridad
+   ```powershell
+   gemini
+   ```
 
-- No pegues claves privadas en el chat ni en archivos del proyecto.
-- No subas `.env` a GitHub.
-- El servidor valida que las conexiones provengan del equipo local y rechaza nombres de host ajenos (protección frente a DNS rebinding).
-- Las operaciones que modifican datos rechazan orígenes web externos y solicitudes marcadas como cross-site.
-- Las claves y otras variables con nombres sensibles se excluyen del entorno heredado por los procesos de proyectos.
-- La terminal y los scripts de los proyectos se ejecutan con los permisos de tu cuenta del sistema. Esto **no es un sandbox**: un proyecto o una dependencia no confiable podría leer o modificar otros archivos a los que tu usuario tenga acceso. Ejecutá únicamente código y dependencias de confianza.
-- No publiques ni expongas este servidor en una red o en Internet. Antes de habilitar acceso remoto o multiusuario hacen falta autenticación, aislamiento real de procesos, límites de recursos y una revisión de seguridad específica.
+   Elegí **Sign in with Google** y completá la autorización en el navegador. Cuando termine, podés cerrar la sesión interactiva.
 
-## Integración GitHub
+6. Iniciá AI Studio:
 
-El código fuente de AI Studio está versionado en este repositorio. La sincronización de los proyectos creados desde la interfaz con repositorios GitHub todavía requiere configuración y desarrollo adicional. Importar este repositorio en una vista previa de un entorno externo no inicia automáticamente el servidor Express: las rutas `/api` y el guardado de claves requieren ejecutar el backend de AI Studio en una instalación local.
+   ```powershell
+   npm run dev
+   ```
 
+7. Abrí [http://localhost:3000](http://localhost:3000) en Chrome.
 
-### Gestión de proyectos
+## Uso diario
 
-- Renombrar un proyecto sin cambiar su identificador interno.
-- Duplicar proyectos para crear una copia independiente de sus archivos.
-- Las copias excluyen dependencias instaladas, compilaciones y el historial interno de conversación.
-- Los archivos de configuración seguros `.gitignore` y `.env.example` se conservan en el explorador y en las exportaciones.
+Cada vez que quieras trabajar:
 
+1. Abrí PowerShell en la carpeta de AI Studio.
+2. Ejecutá `npm run dev`.
+3. Entrá a `http://localhost:3000`.
+4. Elegí ChatGPT o Gemini en el selector.
+5. Escribí el cambio que necesitás. El asistente modifica los archivos del proyecto.
+6. AI Studio intenta iniciar o actualizar la vista previa automáticamente. También podés usar Ejecutar.
 
-La importación y duplicación conservan configuraciones de desarrollo habituales (`.gitignore`, `.env.example`, `.github`, `.vscode` y `.husky`) y excluyen `.env`, credenciales, dependencias y carpetas de compilación.
+No necesitás volver a iniciar sesión en cada uso mientras las sesiones locales sigan vigentes.
 
+## Cómo funciona el acceso gratuito
 
-### Pruebas automáticas
+- **ChatGPT:** Codex CLI inicia sesión con tu cuenta ChatGPT. El uso se rige por los límites del plan de ChatGPT; no usa facturación de OpenAI API.
+- **Gemini:** Gemini CLI permite iniciar sesión con una cuenta Google personal y ofrece una cuota gratuita sujeta a límites de Google. Si se alcanza el límite, hay que esperar a que se restablezca; no se activa facturación automáticamente desde esta aplicación.
+- Ningún asistente utiliza una API Key guardada en este repositorio.
 
-Ejecutá `npm test` para comprobar la API local: creación, lectura y escritura de proyectos, recursos binarios, historial, renombrado, duplicación, exclusión de `.env` y protección contra rutas fuera del proyecto. GitHub Actions ejecuta estas pruebas junto con la compilación en cada push a `main`.
+## Privacidad y seguridad
 
+- AI Studio escucha únicamente en `127.0.0.1` cuando se ejecuta con `npm run dev`.
+- No publiques el servidor ni abras el puerto 3000 a Internet.
+- Las credenciales OAuth permanecen en los directorios locales de Codex y Gemini CLI, no dentro del repositorio.
+- Codex usa el modo `workspace-write` para limitar las modificaciones al proyecto activo.
+- Gemini utiliza el modo `auto_edit`: autoriza las ediciones de archivos y no aprueba automáticamente comandos de terminal.
+- La terminal de AI Studio ejecuta comandos con los permisos de tu usuario de Windows. Ejecutá únicamente proyectos y dependencias de confianza.
 
-### Seguridad del espacio de trabajo
+## Importante sobre la versión publicada
 
-La API de archivos rechaza rutas que atraviesan enlaces simbólicos, no muestra enlaces simbólicos en el explorador y no permite usar una carpeta de proyecto que sea un enlace simbólico. Las pruebas automáticas cubren estos casos. El servidor sigue diseñado para uso local: no lo publiques directamente en Internet sin autenticación, aislamiento de procesos y límites de recursos.
+La publicación alojada en Google AI Studio no puede acceder a los programas ni a las sesiones guardadas en tu computadora. Para utilizar ChatGPT y Gemini con tus cuentas personales, ejecutá esta versión local y abrí `http://localhost:3000` en Chrome. La aplicación funciona como una página web, pero el motor y los archivos permanecen en tu PC.
 
+## Comandos útiles
 
-### Terminal y atajos
-
-La terminal incluye accesos directos para instalar dependencias (`npm install`), compilar (`npm run build`), ejecutar pruebas (`npm test`) y limpiar la salida. En el editor, `Ctrl+S` guarda el archivo y `Ctrl+Shift+Enter` inicia la vista previa.
-
-
-### Límites de archivos en el servidor
-
-El servidor aplica límites aunque se invoque la API directamente: 2 MB para archivos de texto (tanto lectura como escritura) y 7 MB para archivos binarios. Los límites se validan antes de leer o guardar el contenido, y las pruebas automáticas comprueban los rechazos por tamaño.
-
-
-### Procesos y datos internos
-
-El servidor protege también los archivos internos de configuración e historial del proyecto frente a enlaces simbólicos. Al detener una vista previa, al vencer el tiempo de una tarea o al cerrar AI Studio, intenta cerrar el árbol completo de procesos para evitar servidores hijos huérfanos.
+- `npm run dev`: compila y abre el servidor local.
+- `npm run build`: compila la interfaz.
+- `npm test`: ejecuta las pruebas automáticas.
+- `npm run setup:agents`: instala Codex CLI y Gemini CLI.
