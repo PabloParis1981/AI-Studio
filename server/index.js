@@ -119,7 +119,7 @@ app.use((req, res, next) => {
         : "";
       const hostHeader = String(forwardedHost || req.headers.host || "").toLowerCase();
       const originAllowed = parsedOrigin && ["http:", "https:"].includes(parsedOrigin.protocol) &&
-        (IS_PRODUCTION ? Boolean(forwardedHost) && parsedOrigin.host.toLowerCase() === hostHeader
+        (IS_PRODUCTION ? parsedOrigin.host.toLowerCase() === hostHeader
           : LOCAL_HOSTS.has(parsedOrigin.hostname.toLowerCase()) && parsedOrigin.host.toLowerCase() === hostHeader);
       if (!originAllowed) return res.status(403).json({ error: "Origen no permitido." });
     }
