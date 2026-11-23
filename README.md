@@ -21,8 +21,8 @@ Entorno privado de desarrollo asistido por IA para usar desde tu computadora y a
 ## Primera instalación en Windows
 
 1. Descargá este repositorio desde GitHub y descomprimilo.
-2. Abrí PowerShell dentro de la carpeta `AI-Studio`.
-3. Ejecutá:
+2. Si ya tenés Node.js 20 o superior, hacé doble clic en `CONFIGURAR-ASISTENTES.bat`. El archivo instala las dependencias, instala ambos asistentes y abre los dos inicios de sesión. En Gemini elegí **Sign in with Google**; cuando termine la autorización, cerrá Gemini con Ctrl+C.
+3. Si preferís hacerlo manualmente, abrí PowerShell dentro de la carpeta `AI-Studio` y ejecutá:
 
    ```powershell
    npm install
@@ -55,11 +55,7 @@ Entorno privado de desarrollo asistido por IA para usar desde tu computadora y a
 
 ## Uso diario
 
-Cada vez que quieras trabajar:
-
-1. Abrí PowerShell en la carpeta de AI Studio.
-2. Ejecutá `npm run dev`.
-3. Entrá a `http://localhost:3000`.
+Cada vez que quieras trabajar, hacé doble clic en `INICIAR-AI-STUDIO.bat`. Se abre el servidor local y Chrome con la aplicación en `http://localhost:3000`. También podés iniciarlo manualmente desde PowerShell con `npm run dev`.
 4. Elegí ChatGPT o Gemini en el selector.
 5. Escribí el cambio que necesitás. El asistente modifica los archivos del proyecto.
 6. AI Studio intenta iniciar o actualizar la vista previa automáticamente. También podés usar Ejecutar.
